@@ -1,0 +1,27 @@
+{
+  "version": "2026-10-16-user-rules",
+  "salutation": "Türkiye Büyük Millet Meclisi Başkanlığına",
+  "recipients": {
+    "Cumhurbaşkanı Yardımcısı": "Cevdet YILMAZ",
+    "Adalet Bakanı": "Akın GÜRLEK",
+    "Aile ve Sosyal Hizmetler Bakanı": "Mahinur ÖZDEMİR GÖKTAŞ",
+    "Çalışma ve Sosyal Güvenlik Bakanı": "Vedat IŞIKHAN",
+    "Çevre, Şehircilik ve İklim Değişikliği Bakanı": "Murat KURUM",
+    "Dışişleri Bakanı": "Hakan FİDAN",
+    "Enerji ve Tabii Kaynaklar Bakanı": "Alparslan BAYRAKTAR",
+    "Gençlik ve Spor Bakanı": "Osman Aşkın BAK",
+    "Hazine ve Maliye Bakanı": "Mehmet ŞİMŞEK",
+    "İçişleri Bakanı": "Mustafa ÇİFTÇİ",
+    "Kültür ve Turizm Bakanı": "Mehmet Nuri ERSOY",
+    "Millî Eğitim Bakanı": "Yusuf TEKİN",
+    "Millî Savunma Bakanı": "Yaşar GÜLER",
+    "Sağlık Bakanı": "Kemal MEMİŞOĞLU",
+    "Sanayi ve Teknoloji Bakanı": "Mehmet Fatih KACIR",
+    "Tarım ve Orman Bakanı": "İbrahim YUMAKLI",
+    "Ticaret Bakanı": "Ömer BOLAT",
+    "Ulaştırma ve Altyapı Bakanı": "Abdulkadir URALOĞLU"
+  },
+  "internal_rules": null,
+  "return_phrases": null,
+  "summary_style_examples": []
+}

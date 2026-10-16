@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="tr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Önerge İnceleme</title><link rel="stylesheet" href="/assets/style.css"><script defer src="/assets/app.js"></script></head>
+<body>
+<header><div class="brand">Öİ</div><div><p class="eyebrow">YAZILI SORU ÖNERGELERİ</p><h1>Önerge İnceleme</h1></div><span class="badge">Özel geliştirme sürümü</span></header>
+<main>
+<section class="intro"><h2>Belgeyi yükle, dayanaklarıyla incele.</h2><p>Özgün görüntüyü, metin okumasını ve şekil kontrollerini birlikte değerlendirin.</p></section>
+<section class="upload panel"><label for="document">Önerge PDF’si</label><input id="document" type="file" accept="application/pdf,.pdf"><p class="muted">En fazla 12 MB ve 10 sayfa. Analiz başlatıldığında sayfa görüntüleri OpenAI API’ye gönderilir. Uygulama belgeyi kalıcı olarak kaydetmez; standart API saklama koşulları geçerlidir. ZDR etkin olduğu varsayılmaz.</p><div class="actions"><button id="review" disabled>İncelemeyi başlat</button><button id="download" class="secondary" disabled>Raporu indir</button></div><p id="status" role="status" aria-live="polite">Analiz bağlantısı kontrol ediliyor…</p></section>
+<div class="workspace"><section class="panel"><h2>Belge görüntüsü</h2><p id="empty">İncelemek için bir PDF seçin.</p><div id="preview" aria-label="Önerge sayfaları" hidden></div></section><section class="panel"><h2>İnceleme raporu</h2><p class="notice">İçtüzük (67, 96, 97) ve kesin iade kontrolleri henüz tanımlanmadı. Okuma uyumu hatasızlık garantisi değildir; rapor insan incelemesine yardımcıdır.</p><div id="report"><p class="muted">Henüz analiz yapılmadı.</p></div></section></div>
+</main><footer>Belgeye sadık okuma · Ayrı gösterilen belirsizlikler · Dayanaklı şekil kontrolü</footer>
+</body></html>
