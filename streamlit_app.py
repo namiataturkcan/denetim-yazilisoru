@@ -100,10 +100,8 @@ def main():
     result = st.session_state.get("result")
     markings = st.session_state.get("markings")
     if result:
-        counts = [sum(c["status"] == status for c in result["review"]["checks"]) for status in ("uygun", "uyari", "belirsiz")]
-        for col, label, count in zip(st.columns(3), ("✓ Uygun", "✕ Sorunlu", "? Kontrol gerekli"), counts):
-            col.metric(label, count)
-    st.markdown('<div class="legend">✓ Yeşil: uygun &nbsp; · &nbsp; ✕ Kırmızı: sorunlu &nbsp; · &nbsp; ? Sarı: belirsiz / insan kontrolü gerekli</div>', unsafe_allow_html=True)
+        render_status_summary(result["review"]["checks"])
+    st.markdown('<div class="legend">✓ Yeşil: Uygun &nbsp; · &nbsp; ✕ Kırmızı: Hatalı &nbsp; · &nbsp; ? Sarı: Kontrol Gerekli</div>', unsafe_allow_html=True)
     left, right = st.columns([1.15, 1], gap="large")
     with left:
         st.subheader("Belge ve metin")
@@ -126,14 +124,25 @@ def main():
         if result:
             render_report(result)
         else:
-            st.subheader("İnceleme sonucu")
+            st.subheader("İnceleme Sonucu")
             st.info("Belge hazır. İncelemeyi başlattığınızda bulgular bu alanda gösterilecek.")
+
+
+def render_status_summary(checks):
+    statuses = ("uygun", "uyari", "belirsiz")
+    counts = [sum(check["status"] == status for check in checks) for status in statuses]
+    for col, label, status, count in zip(st.columns(3), ("✓ Uygun", "✕ Sorunlu", "? Kontrol Gerekli"), statuses, counts):
+        tone = status if count else "neutral"
+        col.markdown(f'<div class="status-card {tone}"><div>{label}</div><div class="status-count">{count}</div></div>', unsafe_allow_html=True)
+    if len(checks) == 6 and counts[0] == 6:
+        st.success("Şekli bakımdan tüm koşullara uygundur.")
 
 
 def render_report(result):
     review = result["review"]
-    st.subheader("İnceleme sonucu")
-    st.text(review["summary"] or "Özet doğrulanamadı.")
+    st.subheader("İnceleme Sonucu")
+    summary = html.escape(review["summary"] or "Özet doğrulanamadı.")
+    st.markdown(f'<div class="summary-card"><div class="summary-title">Önerge Özeti Önerisi</div><p>{summary}</p></div>', unsafe_allow_html=True)
     st.info("İçtüzük ve kesin iade kuralları henüz tanımlı değil; bu rapor hukuki karar içermez.")
     for warning in result["warnings"]:
         st.warning(warning)

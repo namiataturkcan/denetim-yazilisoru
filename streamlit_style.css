@@ -17,5 +17,13 @@ h1,h2,h3 { color: #172b46; letter-spacing: -.025em; }
 .document-text { background: white; color: #223247; border: 1px solid #d9e1eb; border-radius: 10px; padding: 22px; white-space: pre-wrap; line-height: 1.9; font-family: Georgia, serif; }
 .issue-text { background: #fee2e2; color: #9f1523; border-bottom: 2px solid #cf3445; border-radius: 2px; padding: 2px 0; }
 .legend { font-size: 13px; color: #54657a; margin: 12px 0 18px; }
-[data-testid="stMetric"] { background: white; border: 1px solid #d9e1eb; border-radius: 10px; padding: 12px 18px; }
+.status-card { border: 1px solid; border-radius: 10px; padding: 14px 18px; }
+.status-count { font-size: 2rem; font-weight: 600; margin-top: 6px; }
+.status-card.uygun { background: #e9f7ef; border-color: #93c6aa; color: #175c39; }
+.status-card.uyari { background: #fff0f0; border-color: #e6a3a6; color: #91252d; }
+.status-card.belirsiz { background: #fff7dc; border-color: #ddc58c; color: #79581a; }
+.status-card.neutral { background: #edf0f4; border-color: #d5dce5; color: #657184; }
+.summary-card { background: #fff; color: #223247; border: 1px solid #d9e1eb; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+.summary-title { font-weight: 700; color: #172b46; }
+.summary-card p { margin: 10px 0 0; white-space: pre-wrap; line-height: 1.6; }
 @media(max-width:700px) { .block-container { padding: 1rem; } .check-heading { flex-direction: column; gap: 3px; } }
