@@ -5,7 +5,6 @@ h1,h2,h3 { color: #172b46; letter-spacing: -.025em; }
 [data-testid="stSidebar"] { background: #e9eef4; }
 [data-testid="stFileUploader"] { background: white; border: 1px solid #d9e1eb; border-radius: 12px; padding: 12px; }
 .hero { border-top: 4px solid #a98b51; border-bottom: 1px solid #d7dfeb; padding: 12px 0 22px; margin-bottom: 24px; }
-.hero .eyebrow { color: #65748a; text-transform: uppercase; letter-spacing: .16em; font-size: 12px; font-weight: 700; }
 .hero h1 { margin: 8px 0; font-size: 2.2rem; }
 .hero p { color: #536479; margin: 0; }
 .check-card { background: white; border: 1px solid; border-left-width: 4px; border-radius: 10px; padding: 16px 18px; margin: 0 0 12px; line-height: 1.6; }

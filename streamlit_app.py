@@ -25,9 +25,9 @@ def setting(name, default=""):
 
 
 def main():
-    st.set_page_config(page_title="Önerge İnceleme", page_icon="📄", layout="wide")
+    st.set_page_config(page_title="Yazılı Soru Önergesi Yapay Zeka Analizi", page_icon="📄", layout="wide")
     st.markdown("<style>" + Path(__file__).with_name("streamlit_style.css").read_text() + "</style>", unsafe_allow_html=True)
-    st.markdown('<div class="hero"><div class="eyebrow">Yazılı soru önergeleri · Şekil incelemesi</div><h1>Önerge İnceleme</h1><p>Belgeyi inceleyin, bulguları kaynağı üzerinde görün, raporu indirin.</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero"><h1>Yazılı Soru Önergesi Yapay Zeka Analizi</h1><p>Belgeyi inceleyin, bulguları kaynağı üzerinde görün, raporu indirin.</p></div>', unsafe_allow_html=True)
     password = setting("APP_PASSWORD")
     if not password:
         st.error("Uygulama erişim parolası henüz yapılandırılmadı.")
