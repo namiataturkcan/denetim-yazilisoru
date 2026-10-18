@@ -104,7 +104,7 @@ def main():
     st.markdown('<div class="legend">✓ Yeşil: Uygun &nbsp; · &nbsp; ✕ Kırmızı: Hatalı &nbsp; · &nbsp; ? Sarı: Kontrol Gerekli</div>', unsafe_allow_html=True)
     left, right = st.columns([1.15, 1], gap="large")
     with left:
-        st.subheader("Belge ve metin")
+        st.subheader("Belge ve Metin")
         for i, page in enumerate(pages, 1):
             image_tab, text_tab = st.tabs([f"Sayfa {i} · Belge", f"Sayfa {i} · Metin"])
             with image_tab:
