@@ -12,6 +12,7 @@ import app as service
 
 @pytest.fixture(autouse=True)
 def no_real_credentials(monkeypatch):
+    monkeypatch.delenv("ONERGE_DIRECT_API_KEY", raising=False)
     monkeypatch.delenv("ONERGE_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
@@ -50,6 +51,23 @@ def test_health_and_ui_without_key(client):
     assert client.get("/assets/app.js").status_code == 200
     assert client.get("/assets/rules.json").status_code == 404
     assert post(client, pdf()).status_code == 503
+
+
+def test_direct_binding_takes_priority_without_exposing_values(client, monkeypatch):
+    monkeypatch.setenv("ONERGE_DIRECT_API_KEY", "direct-test-only")
+    monkeypatch.setenv("ONERGE_API_KEY", "network-test-only")
+    assert service.api_key() == "direct-test-only"
+    h = client.get("/api/health")
+    assert h.json()["api_key_source"] == "ONERGE_DIRECT_API_KEY"
+    assert "direct-test-only" not in h.text
+    assert "network-test-only" not in h.text
+
+
+def test_empty_direct_binding_preserves_existing_network_binding(client, monkeypatch):
+    monkeypatch.setenv("ONERGE_DIRECT_API_KEY", "")
+    monkeypatch.setenv("ONERGE_API_KEY", "network-test-only")
+    assert service.api_key() == "network-test-only"
+    assert client.get("/api/health").json()["api_key_source"] == "ONERGE_API_KEY"
 
 
 @pytest.mark.parametrize("data,status", [(b"not a PDF",400),(b"%PDF-broken",400),(b"a"*(service.MAX_BYTES+1),413)])
@@ -114,10 +132,13 @@ def test_incomplete_report_rejected():
     assert e.value.status_code == 502
 
 
-def test_full_http_pipeline_with_mocked_openai(client, monkeypatch):
-    monkeypatch.setenv("ONERGE_API_KEY", "test-only")
+@pytest.mark.parametrize("key_name", ["ONERGE_API_KEY", "ONERGE_DIRECT_API_KEY"])
+def test_full_http_pipeline_with_mocked_openai(client, monkeypatch, key_name):
+    monkeypatch.setenv("ONERGE_API_KEY", "network-decoy")
+    monkeypatch.setenv(key_name, "test-only")
     captured=[]
     def respond(request):
+        assert request.headers["Authorization"] == "Bearer test-only"
         body=json.loads(request.content);captured.append(body)
         return httpx.Response(200,json={"id":"resp_test","object":"response","created_at":0,
             "model":"gpt-4.1","status":"completed","error":None,"incomplete_details":None,
@@ -146,5 +167,5 @@ def test_upstream_failure_is_safe(client,monkeypatch):
     monkeypatch.setattr(service,"AsyncOpenAI",fake_client)
     result=post(client,pdf())
     assert result.status_code == 502
-    assert "kabul edilmedi" in result.text
+    assert "kimliğini doğrulayamadı" in result.text
     assert "sensitive-upstream-text" not in result.text

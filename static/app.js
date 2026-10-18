@@ -5,7 +5,7 @@ let configured = false, busy = false, report = null, previewReady = false;
 function node(tag, text, className) { const n = document.createElement(tag); n.textContent = text; if(className)n.className=className; return n; }
 function status(text,error=false){el('status').textContent=text;el('status').className=error?'error':'';}
 function buttons(){el('review').disabled=busy||!configured||!previewReady||!el('document').files[0];el('document').disabled=busy;el('download').disabled=busy||!report;}
-async function health(){try{const r=await fetch('/api/health');if(!r.ok)throw Error();const h=await r.json();configured=h.api_configured;if(!busy)status(configured?'Analiz bağlantısı yapılandırılmış. PDF seçip incelemeyi başlatabilirsiniz.':'Analiz anahtarı eksik. Ortam ayarlarında ONERGE_API_KEY eklenene kadar inceleme başlatılamaz.',!configured);}catch{configured=false;status('Uygulama sunucusuna ulaşılamadı.',true);}buttons();}
+async function health(){try{const r=await fetch('/api/health');if(!r.ok)throw Error();const h=await r.json();configured=h.api_configured;if(!busy)status(configured?'Analiz bağlantısı yapılandırılmış. PDF seçip incelemeyi başlatabilirsiniz.':'Analiz anahtarı eksik. Sunucunun API bağlantı ayarı tamamlanana kadar inceleme başlatılamaz.',!configured);}catch{configured=false;status('Uygulama sunucusuna ulaşılamadı.',true);}buttons();}
 el('document').addEventListener('change',async()=>{
  report=null;el('report').replaceChildren(node('p','Henüz analiz yapılmadı.','muted'));
  previewReady=false;el('preview').replaceChildren();

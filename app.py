@@ -45,8 +45,19 @@ class Review(BaseModel):
     summary: str
 
 
+def api_key_source():
+    # A direct variable must have a different name from a proxy network secret.
+    # Do not silently fall back after an authentication failure: that could use
+    # a different account and obscure which binding is being tested.
+    for name in ("ONERGE_DIRECT_API_KEY", "ONERGE_API_KEY", "OPENAI_API_KEY"):
+        if os.environ.get(name):
+            return name
+    return None
+
+
 def api_key():
-    return os.environ.get("ONERGE_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    source = api_key_source()
+    return os.environ.get(source) if source else None
 
 
 @app.middleware("http")
@@ -85,6 +96,7 @@ async def assets(name: str):
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "api_configured": bool(api_key()),
+            "api_key_source": api_key_source(),
             "model": os.environ.get("ONERGE_MODEL", "gpt-4.1"),
             "rules_version": RULES["version"], "internal_rules_ready": False}
 
@@ -196,7 +208,7 @@ async def preview_pdf(request: Request):
 @app.post("/api/review")
 async def review_pdf(request: Request):
     if not api_key():
-        raise HTTPException(503, "Analiz anahtarı henüz yapılandırılmadı. Ortam ayarlarında ONERGE_API_KEY eklenmeli.")
+        raise HTTPException(503, "Analiz anahtarı henüz yapılandırılmadı. Sunucunun API bağlantı ayarı tamamlanmalı.")
     if gate.locked():
         raise HTTPException(429, "Bir inceleme sürüyor; tamamlandığında tekrar deneyin.")
     async with gate:
@@ -207,7 +219,7 @@ async def review_pdf(request: Request):
         except (APITimeoutError, APIConnectionError):
             raise HTTPException(502, "Analiz servisine ulaşılamadı veya süre doldu. Ağ ve API ayarlarını kontrol edin.")
         except APIStatusError as exc:
-            detail = {401: "API anahtarı kabul edilmedi.", 403: "API erişimine izin verilmedi.",
+            detail = {401: "OpenAI bağlantının kimliğini doğrulayamadı. Sunucunun API bağlantı ayarı kontrol edilmeli.", 403: "API erişimine izin verilmedi.",
                       429: "API kotası veya kullanım sınırı aşıldı.", 404: "Seçilen model kullanılamıyor."}
             raise HTTPException(502, detail.get(exc.status_code, "Analiz servisi isteği tamamlayamadı."))
         except ValueError:
