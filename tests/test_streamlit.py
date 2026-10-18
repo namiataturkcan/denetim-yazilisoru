@@ -28,7 +28,7 @@ def test_login_logout_and_rotation(monkeypatch):
     at.button[0].click().run()
     assert not at.exception
     assert len(at.get('file_uploader')) == 1
-    at.sidebar.button[0].click().run()
+    next(b for b in at.button if b.label == 'Çıkış yap').click().run()
     assert not at.get('file_uploader')
     at.text_input[0].set_value('test-password-only')
     at.button[0].click().run()
@@ -49,7 +49,12 @@ def test_upload_analysis_and_clear(monkeypatch):
     async def mock_analyze(pages, *, credential, model):
         assert credential == 'test-api-only'
         assert len(pages) == 1
-        return report()
+        result = report()
+        result.pages[0].text = 'Reference text 10'
+        for c in result.checks:
+            c.quote = 'Reference text 10'
+        result.checks[0].status = 'uyari'
+        return result
     with patch('streamlit.file_uploader', return_value=Upload()), patch('app.analyze', mock_analyze):
         at.run()
         at.text_input[0].set_value('test-password-only')
@@ -57,8 +62,14 @@ def test_upload_analysis_and_clear(monkeypatch):
         next(b for b in at.button if b.label == 'İncelemeyi başlat').click().run()
         assert not at.exception
         assert at.session_state['result']['review']['summary'].endswith('ilişkin')
-        assert len(at.get('download_button')) == 1
+        assert len(at.get('download_button')) == 2
+        assert len(at.session_state['markings']['locations']) == 1
+        rendered = '\n'.join(m.value for m in at.markdown)
+        assert 'check-card uyari' in rendered
+        assert 'check-card uygun' in rendered
+        assert '<mark class="issue-text">Reference text 10</mark>' in rendered
     with patch('streamlit.file_uploader', return_value=None):
         at.run()
         assert 'result' not in at.session_state
         assert 'pages' not in at.session_state
+        assert 'markings' not in at.session_state

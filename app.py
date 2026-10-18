@@ -133,7 +133,9 @@ async def analyze(pages, *, credential=None, model=None):
     belirt. Kesin olmayan ifadeyi tahmin ederek tamamlama. Sayfalar 1'den başlar.
     Altı kontrolün her birini tam bir kez raporla: hitap, milletvekili, secim_cevresi, muhatap,
     talep, harf. Her kontrolde sayfa ve özgün metinden birebir alıntı ver; bulunmayan alanın
-    alıntısı boş olsun. Belirsiz okumadan kesin uygun/uyarı sonucu çıkarma.
+    alıntısı boş olsun. Uyarı alıntısı, sorunlu kısmı içeren en kısa yeterli özgün ifade olsun;
+    tüm sayfayı alıntılama ve alıntıya açıklama veya üç nokta ekleme.
+    Belirsiz okumadan kesin uygun/uyarı sonucu çıkarma.
     Hitap verilen ifadeyle aynı olmalı. Milletvekili adı ve seçim çevresi bulunmalı.
     Muhatap unvanı ve kişi adı yalnızca aşağıdaki kullanıcı listesine göre doğru eşleşmeli;
     dış bilgi kullanma. Yazım hatalarını bildir. Harf büyüklüğü farklarını yalnızca başlık

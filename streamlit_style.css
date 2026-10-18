@@ -1,0 +1,22 @@
+:root { color-scheme: light; }
+.stApp { background: #f3f5f8; color: #1b2a3b; }
+.block-container { max-width: 1500px; padding-top: 2.5rem; }
+h1,h2,h3 { color: #172b46; letter-spacing: -.025em; }
+[data-testid="stSidebar"] { background: #e9eef4; }
+[data-testid="stFileUploader"] { background: white; border: 1px solid #d9e1eb; border-radius: 12px; padding: 12px; }
+.hero { border-top: 4px solid #a98b51; border-bottom: 1px solid #d7dfeb; padding: 12px 0 22px; margin-bottom: 24px; }
+.hero .eyebrow { color: #65748a; text-transform: uppercase; letter-spacing: .16em; font-size: 12px; font-weight: 700; }
+.hero h1 { margin: 8px 0; font-size: 2.2rem; }
+.hero p { color: #536479; margin: 0; }
+.check-card { background: white; border: 1px solid; border-left-width: 4px; border-radius: 10px; padding: 16px 18px; margin: 0 0 12px; line-height: 1.6; }
+.check-card.uygun { border-color: #93c6aa; background: #f0faf4; color: #175c39; }
+.check-card.uyari { border-color: #e6a3a6; background: #fff2f2; color: #91252d; }
+.check-card.belirsiz { border-color: #ddc58c; background: #fff9e9; color: #79581a; }
+.check-heading { display: flex; justify-content: space-between; gap: 12px; font-weight: 700; }
+.check-card blockquote { margin: 10px 0 0; padding: 8px 12px; border-left: 2px solid currentColor; background: #ffffff80; white-space: pre-wrap; }
+.check-card p { margin: 8px 0 0; white-space: pre-wrap; }
+.document-text { background: white; color: #223247; border: 1px solid #d9e1eb; border-radius: 10px; padding: 22px; white-space: pre-wrap; line-height: 1.9; font-family: Georgia, serif; }
+.issue-text { background: #fee2e2; color: #9f1523; border-bottom: 2px solid #cf3445; border-radius: 2px; padding: 2px 0; }
+.legend { font-size: 13px; color: #54657a; margin: 12px 0 18px; }
+[data-testid="stMetric"] { background: white; border: 1px solid #d9e1eb; border-radius: 10px; padding: 12px 18px; }
+@media(max-width:700px) { .block-container { padding: 1rem; } .check-heading { flex-direction: column; gap: 3px; } }
