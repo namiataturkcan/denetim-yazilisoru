@@ -6,3 +6,5 @@ __pycache__/
 !.env.example
 *.pdf
 *.log
+
+.streamlit/secrets.toml
