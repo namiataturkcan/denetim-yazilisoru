@@ -117,8 +117,8 @@ def render_incoming_report(result):
     if result['ranges']:
         st.caption('Noktalı virgülle ayrılmış tek satır · sağ üstteki simgeden kopyalayabilirsiniz.')
         st.code(result['ranges_text'], language=None, wrap_lines=True)
-        with st.expander('Aralıkları alt alta göster'):
-            st.code('\n'.join(result['ranges']), language=None)
+        st.caption('Alt alta liste')
+        st.code('\n'.join(result['ranges']), language=None)
     else:
         st.info('Bu aralıkta listeye alınacak cevaplanmamış kayıt bulunamadı.')
     for group in ('announced', 'pending'):
