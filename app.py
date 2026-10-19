@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 import pymupdf
+from recipient_validation import validate_recipient
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from openai import AsyncOpenAI, APIConnectionError, APIStatusError, APITimeoutError
@@ -138,7 +139,9 @@ async def analyze(pages, *, credential=None, model=None):
     Belirsiz okumadan kesin uygun/uyarı sonucu çıkarma.
     Hitap verilen ifadeyle aynı olmalı. Milletvekili adı ve seçim çevresi bulunmalı.
     Muhatap unvanı ve kişi adı yalnızca aşağıdaki kullanıcı listesine göre doğru eşleşmeli;
-    dış bilgi kullanma. Yazım hatalarını bildir. Harf büyüklüğü farklarını yalnızca başlık
+    dış bilgi kullanma. Eski veya güncel olduğuna dair kendi bilgini kullanma.
+    Görüntüdeki bakan adını listeye uydurarak değiştirme; yanlış isim de olsa aynen aktar.
+    Yazım hatalarını bildir. Harf büyüklüğü farklarını yalnızca başlık
     veya muhatap tamamen küçük harfli olduğunda uyar. 'Rica ederim' uygunsuzdur; diğer talep
     ifadeleri için yeni yasak üretme. Özet en fazla 10 kelime olsun ve 'ilişkin' ile bitsin;
     yalnızca belgenin konusu olsun. Konu okunamıyorsa summary boş olsun.
@@ -170,6 +173,7 @@ def finalize(review: Review, pages):
     if not review.summary or len(review.summary.split()) > 10 or review.summary.split()[-1] != "ilişkin":
         review.summary = ""
         warnings.append("Özet doğrulanamadı; yeniden inceleme gerekiyor.")
+    validate_recipient(review, RULES["recipients"])
     readings = {p.page: p for p in review.pages}
     for c in review.checks:
         reading = readings[c.page]
