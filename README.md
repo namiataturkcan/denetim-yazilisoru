@@ -1,6 +1,6 @@
-# Önerge İnceleme
+# Yazılı Soru İşlemleri
 
-Yazılı soru önergesi PDF'lerini görüntüden okuyup mevcut PDF metin katmanıyla karşılaştıran, kullanıcı kurallarına göre şekil incelemesi yapan özel geliştirme uygulaması.
+Parola korumalı Streamlit uygulaması, girişten sonra iki işlem sunar: **Yazılı Soru Önergesi İncelemesi** ve **Gelen Kağıt İşlemleri**. Önerge incelemesi PDF görüntülerini okuyup kullanıcı kurallarıyla doğrular. Gelen Kağıt İşlemleri, Excel veya yapıştırılan tablo üzerinden cevaplanmamış önerge aralıklarını ve muhatapları hesaplar.
 
 ## Streamlit ile özel kullanım
 
@@ -26,7 +26,7 @@ Yerel Streamlit çalıştırma (ortam değişkenleri veya gitignore kapsamındak
 uv run --frozen streamlit run streamlit_app.py --server.address 127.0.0.1
 ```
 
-Streamlit dağıtımı henüz kullanıcının hesabında yapılmadı; kod hazırlığı bir site yayını değildir.
+Mevcut uygulama: https://denetim-yazilisoru.streamlit.app/. GitHub dalına gönderilen güncellemenin Streamlit tarafından alınması gerekir. Açılış ekranındaki sürüm bilgisi yeni yayını ayırt etmek içindir; gerektiğinde Streamlit yönetiminden Reboot yapılır.
 
 ## FastAPI geliştirme sunucusunu çalıştırma
 
@@ -55,7 +55,7 @@ FastAPI geliştirme sunucusu yalnızca loopback adresine bağlanır ve kullanıc
 - Özet, kullanıcının Excel’indeki üsluba göre çoğunlukla 6–14 kelimelik nötr bir konu tamlamasıdır ve “ilişkin” ile biter. Excel’deki en uzun örnek esas alınarak üst sınır 31 kelimedir. İddialar olguya dönüştürülmez; gereksiz yer/tarih/kurum bilgileri eklenmez.
 - `rules.json` içindeki 18 kişilik muhatap listesi kullanıcının listesidir; dışarıdan güncellenmez. İçtüzük 67/96/97 uygulama kuralları ve kesin iade ibareleri henüz eklenmemiştir. Özet üslup örnekleri `summary_style.json` içindedir.
 - Belge ve rapor sunucuda kalıcı olarak saklanmaz; istek bellekte işlenir. Kullanıcı raporu JSON olarak indirebilir. `store:false` kullanılır; bu ayar ZDR değildir ve API hizmetinin diğer saklama koşullarını kaldırmaz.
-- Aynı anda bir inceleme yapılır. Eksik anahtar, kota, erişim ve ağ hataları arayüzde açıkça gösterilir.
+- Aynı sunucu sürecinde, farklı Streamlit oturumları dahil, aynı anda bir ücretli inceleme yapılır. PDF işleme çağrıları süreç içinde sırayla çalıştırılır; farklı sunucu süreçleri ayrı sınırlara sahiptir. Eksik anahtar, kota, erişim ve ağ hataları arayüzde açıkça gösterilir.
 
 ## Doğrulama
 
@@ -84,10 +84,35 @@ Model değerlendirmesinden sonra, açık unvan–isim ifadeleri kullanıcı list
 
 `KKBS_YazılıOnerge_Rapor_19-10-2026 09_27.xlsx` dosyasındaki 50.416 kayıt incelendi; tamamı 28. döneme ait. `Soru Sahibi` ve `Soru Sahibi İli` alanlarından 312 farklı, çelişkisiz eşleşme `member_reference.json` içine alındı. Bu döküm tüm milletvekillerini veya aktif görev durumlarını kapsamaz. Kaynakta bulunmayan isimler tahmin edilmez: gri **Kaynakta kayıt yok** sonucuyla gösterilir ve uygun sayılmaz. Eksik kaynak, OCR belirsizliği olarak adlandırılmaz.
 
-Seçim çevresi kontrolü, imza alanından birebir okunan isim ve ili karşılaştırır. İstanbul yerine Diyarbakır yazılması gereken bir üyede yanlış il kırmızı uyarıdır. Kullanıcının açık talimatı gereği Dersim, Tunceli'nin eş anlamlısı kabul edilmez. Belgede geçen konu/olay yerleri seçim çevresi olarak kullanılmaz. Çok imzalı belgelerde her imza kontrol edilir; tek seçim çevresi kartında bütün sonuçlar açıklanır, ilk kesin hata vurgulanır.
+Seçim çevresi kontrolü, imza alanından birebir okunan isim ve ili karşılaştırır. İstanbul yerine Diyarbakır yazılması gereken bir üyede yanlış il kırmızı uyarıdır. Kullanıcının açık talimatı gereği Dersim, Tunceli'nin eş anlamlısı kabul edilmez. Belgede geçen konu/olay yerleri seçim çevresi olarak kullanılmaz. Çok imzalı belgelerde her imza kontrol edilir; tek seçim çevresi kartında bütün sonuçlar açıklanır; bütün kesin hatalar kendi sayfalarında ve imza bloklarında işaretlenir.
 
 Excel'in tarihsel bakan isimleri muhatap listesine alınmamıştır; bakan kontrolü yalnızca `rules.json` içindeki kullanıcı listesiyle yapılır. Ham Excel ve tüm önerge dökümü depoya eklenmez. Gerekli ad–il eşleşmeleri, kaynak dosyanın SHA-256 değeri, üslup istatistikleri ve 22 temsili özet örneği tutulur. Kaynakları yeniden üretmek için openpyxl kurulu Python ile `python scripts/import_reference_workbook.py DOSYA.xlsx` kullanılabilir; farklı dönem veya çelişkili kayıtlar otomatik olarak güncel kabul edilmez.
 
 Özet analizinde medyan 10, yüzde 90 eşiği 14, maksimum 31 kelime bulundu; 19.766 özet 10 kelimeden uzundu. Örnekler sadece üslup içindir, belgeye dış bilgi eklemek için kullanılmaz. Yeni kaynaklarla güncelleme yapıldığında belgeyi yeniden analiz edin; eski raporlar kendiliğinden yeniden değerlendirilmez.
 
 Bakan adlarını okuma aşaması, doğrulama listesinden ayrıdır: model beklenen bakan isimlerini görmez; görüntüden birebir okuma yapar, sonuç kodda kullanıcı listesiyle karşılaştırılır. PDF/OCR'den ayrıca çıkarılan açık muhatap farklıysa uygun onayı engellenir. Kullanılan listenin kopyası ve iki okuma raporun `recipient_audit` alanında ve arayüzdeki “Bakan kontrolünde kullanılan liste ve okumalar” bölümünde bulunur. Bakan kontrolünün sürümü değiştiğinde ekranda kalmış eski rapor kaldırılır; yeniden analiz gerekir. Kullanıcının yeniden teyit ettiği eşleşmeler İçişleri Mustafa ÇİFTÇİ ve Adalet Akın GÜRLEK'tir.
+
+
+## Gelen Kağıt İşlemleri
+
+Girişten sonra **Gelen Kağıt İşlemleri** seçilir. Excel (`.xlsx`) yüklenir veya tablo yapıştırılır; çalışma sayfası, gerekiyorsa yasama dönemi ve başlangıç/bitiş esas numarası seçilerek **Listeyi oluştur** çalıştırılır. İki uç numara da dahildir. Başlıklı KKBS tablolarında `Esas No`, `Son Durum`, `Muhatap Unvanı` ve varsa `Donem Adı` okunur. Başlıksız yapıştırmada ilk üç sütun esas numarası, durum ve muhatap olmalıdır. En fazla 12 MB ve 100.000 veri satırı desteklenir.
+
+- `Cevaplanmadığı Gelen Kağıtlarda İlan Edildi` ile `15 Günlük Cevaplanma Süresi Devam Ediyor` birleşik cevaplanmamış listesine alınır; alt grupları ayrıca gösterilir. Tarihten son durum tahmin edilmez.
+- `Cevaplandı`, `Süresi İçinde Cevaplandı` ve `Süresi Geçtikten Sonra Cevaplandı` cevaplanan gruptadır. Geri alınanlar ayrıca sayılır ve cevaplanmamış listesine alınmaz.
+- Aynı esas numarasının eşdeğer satırları tek sayılır. Çelişen kayıtlar ve tanınmayan durumlar ayrı gösterilir; sessizce cevaplanmamış kabul edilmez. Dönemler birbirine karıştırılmaz.
+- Dosyada bulunmayan esas numaraları açıkça listelenir; eksik satırdan cevaplanmamış önerge üretilmez. Geçersiz numaralı satırlar kaynak satır numaralarıyla bildirilir.
+- Bulunan ve eksik muhataplar yalnızca seçilen cevaplanmamış kayıtlar üzerinden, kullanıcıya ait 18 muhataplık listeye göre hesaplanır. Bu modül kişi adını doğrulamaz; bakan/bakanlık unvanları aynı kurum adı altında toplanır. Liste dışındaki muhataplar ayrıca görünür.
+- Sonuç metni kopyalanabilir; TXT, CSV ve JSON indirilebilir. CSV'de formül olarak yorumlanabilecek metinler etkisizleştirilir.
+- Bu bölüm OpenAI kullanmaz, API anahtarı gerektirmez ve API ücreti oluşturmaz. Dosyalar ortak önbelleğe veya diske yazılmaz; kaynak ya da aralık değiştiğinde eski sonuç kaldırılır, çıkışta oturum temizlenir.
+
+Referans konuşmadaki **49220–49329** aralığı, kullanıcının 50.416 satırlık gerçek Excel dosyasıyla doğrulandı: 110 kayıt, 97 cevap süresi devam eden, 13 cevaplanan; 16 muhatap ve eksik olarak Dışişleri ile Millî Savunma Bakanlıkları. Konuşmadaki sekiz esas numarası aralığı da aynen üretildi.
+
+## Analiz düzeltmeleri ve sürüm takibi
+
+Kontroller daima hitap, milletvekili, seçim çevresi, muhatap, talep ve harf/yazım sırasındadır. Aynı model yanıtının tekrar doğrulanması özgün yanıtı değiştirmez. OCR karşılaştırması sayfa başına bir kez hesaplanır; alıntının başka yerde tekrar etmesi ilgili konumdaki farkı gizlemez. İlgili alan içindeki anlamlı ekleme ve çıkarmalar da kontrol edilir; farklı bir paragraftaki değişiklik bütün kontrolleri sarıya çevirmez.
+
+Tekrarlanan muhataplar tek kimlik olarak değerlendirilir; açık cevaplandırma talebi varsa anlatı içinde anılan diğer bakanlar muhatap sayılmaz. Sayın, Prof./Doç./Dr. ve yaygın kesme işareti ekleri desteklenir. Kullanıcı listesi dışında bakan bilgisi alınmaz.
+
+PDF üzerindeki işaretler tamamlanmış analizden ayrı üretilir. PDF/OCR işaretleme hatası, metindeki bulguları ve indirilebilir JSON raporunu kaybettirmez. **PDF işaretlerini yeniden oluştur** yalnızca işaretlemeyi yeniden dener, ücretli API analizi başlatmaz. İşaretler eklenmeden önce tüm konumlar özgün sayfada aranır; OCR işlemi de 2200 piksel uzun kenar sınırına göre ölçeklenir.
+
+Analiz sürümü, doğrulama kodu ve kullanıcı kaynaklarının içerik özetiyle belirlenir. Kaynaklar veya kurallar değiştiğinde eski oturum raporu kaldırılır. Gelen Kağıt raporlarında da işlem sürümü ve kaynak dosyanın özeti bulunur. Otomatik testler, canlı API ile hassas olmayan örnek PDF'ler ve gerçek Excel aralığı kontrolü farklı doğrulama katmanlarıdır; modelin her belgeyi hatasız okuyacağı garantisi değildir.

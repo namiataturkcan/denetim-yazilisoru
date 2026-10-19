@@ -3,7 +3,7 @@ from recipient_validation import normalize
 from reading_validation import evidence_present, field_present, serious_disagreement
 
 
-def validate_constituency(review, pages, reference):
+def validate_constituency(review, pages, reference, comparisons=None):
     check = next(c for c in review.checks if c.kind == 'secim_cevresi')
     readings = {p.page: p for p in review.pages}
     members = {normalize(name): (name, province) for name, province in reference['members'].items()}
@@ -31,7 +31,8 @@ def validate_constituency(review, pages, reference):
         if not readable:
             status = 'belirsiz'
             explanation = 'İmza bölümündeki ad veya seçim çevresi güvenle okunamadı.'
-        elif serious_disagreement(page.text, pages[signer.page-1]['ocr'], quote):
+        elif (comparisons[signer.page].disagrees(quote) if comparisons else
+              serious_disagreement(page.text, pages[signer.page-1]['ocr'], quote)):
             status = 'belirsiz'
             explanation = 'İmza bölümündeki ad/seçim çevresi, PDF metin katmanı ile görsel okumada farklı; insan kontrolü gerekiyor.'
         elif not signer.constituency:
@@ -62,4 +63,9 @@ def validate_constituency(review, pages, reference):
     check.status, check.page, check.quote = selected[:3]
     check.reading_uncertain = check.status == 'belirsiz'
     check.explanation = '\n'.join(item[3] for item in outcomes)
-    return selected[4]
+    return {
+        'highlight_context': selected[4],
+        'findings': [dict(status=status, page=page, quote=quote, explanation=explanation,
+                          highlight_context=context)
+                     for status, page, quote, explanation, context in outcomes],
+    }

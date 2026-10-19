@@ -14,7 +14,8 @@ import streamlit as st
 from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
-from app import ANALYSIS_VERSION, MAX_BYTES, analyze, finalize, prepare_pdf
+from app import ANALYSIS_VERSION, RELEASE, MAX_BYTES, RULES, analyze, finalize, prepare_pdf
+from incoming_ui import render_incoming
 
 
 def setting(name, default=""):
@@ -24,10 +25,28 @@ def setting(name, default=""):
         return os.environ.get(name, default)
 
 
+def create_markings(data, result):
+    st.session_state.pop("markings", None)
+    st.session_state.pop("markings_error", None)
+    try:
+        st.session_state["markings"] = annotate_pdf(data, result["review"]["checks"])
+    except Exception:
+        # A PDF renderer/OCR failure must not discard a paid, completed analysis.
+        st.session_state["markings_error"] = (
+            "Analiz tamamlandı; PDF üzerindeki işaretler oluşturulamadı. "
+            "Metindeki işaretleri inceleyebilir ve JSON raporunu indirebilirsiniz.")
+
+
 def main():
-    st.set_page_config(page_title="Yazılı Soru Önergesi Yapay Zeka Analizi", page_icon="📄", layout="wide")
+    section = st.session_state.get("active_module")
+    titles = {"review": "Yazılı Soru Önergesi İncelemesi", "incoming": "Gelen Kağıt İşlemleri"}
+    title = titles.get(section, "Yazılı Soru İşlemleri")
+    subtitle = {"review": "Belgeyi inceleyin, bulguları kaynağı üzerinde görün, raporu indirin.",
+                "incoming": "Cevaplanmamış önergeleri, esas numarası aralıklarını ve muhatapları listeleyin."}.get(section, "Yapmak istediğiniz işlemi seçin.")
+    st.set_page_config(page_title=title, page_icon="📄", layout="wide")
     st.markdown("<style>" + Path(__file__).with_name("streamlit_style.css").read_text() + "</style>", unsafe_allow_html=True)
-    st.markdown('<div class="hero"><h1>Yazılı Soru Önergesi Yapay Zeka Analizi</h1><p>Belgeyi inceleyin, bulguları kaynağı üzerinde görün, raporu indirin.</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="hero"><h1>{title}</h1><p>{subtitle}</p></div>', unsafe_allow_html=True)
+    st.caption(f"Sürüm: {RELEASE}")
     password = setting("APP_PASSWORD")
     if not password:
         st.error("Uygulama erişim parolası henüz yapılandırılmadı.")
@@ -48,31 +67,58 @@ def main():
     if st.button("Çıkış yap", type="tertiary"):
         st.session_state.clear()
         st.rerun()
+    if section not in titles:
+        render_home()
+        return
+    if st.button("← İşlem seçimine dön", type="tertiary"):
+        st.session_state.pop("active_module", None)
+        st.rerun()
+    if section == "incoming":
+        render_incoming(RULES["recipients"])
+        return
+    render_review()
+
+
+def select_module(name):
+    st.session_state["active_module"] = name
+
+
+def render_home():
+    left, right = st.columns(2, gap="large")
+    with left:
+        st.markdown('<div class="module-card"><div class="module-number">01 · BELGE İNCELEMESİ</div><h2>Yazılı Soru Önergesi İncelemesi</h2><p>Önerge PDF’sini yükleyin. Şekil kontrollerini, bakan ve seçim çevresi eşleşmelerini inceleyin; hataları belge üzerinde görün.</p></div>', unsafe_allow_html=True)
+        st.button("Önerge incelemesine geç", type="primary", width="stretch", on_click=select_module, args=("review",))
+    with right:
+        st.markdown('<div class="module-card"><div class="module-number">02 · LİSTE İŞLEMLERİ</div><h2>Gelen Kağıt İşlemleri</h2><p>Excel yükleyin veya tablo yapıştırın. Esas numarası aralığına göre cevaplanmamış önergeleri, bulunan ve eksik muhatapları listeleyin.</p></div>', unsafe_allow_html=True)
+        st.button("Gelen kağıt işlemlerine geç", type="primary", width="stretch", on_click=select_module, args=("incoming",))
+
+
+def render_review():
     key = setting("ONERGE_DIRECT_API_KEY") or setting("ONERGE_API_KEY") or setting("OPENAI_API_KEY")
     if not key:
         st.error("Analiz bağlantısı henüz yapılandırılmadı.")
-        st.stop()
     st.caption("En fazla 12 MB, 10 sayfa PDF. Analiz sırasında sayfa görüntüleri OpenAI'a gönderilir. Sonuçları belgeyle karşılaştırarak kontrol edin.")
     uploaded = st.file_uploader("Önerge PDF’sini yükle", type=["pdf"])
     if uploaded is None:
-        for name in ("document", "pages", "result", "markings"):
+        for name in ("document", "pages", "result", "markings", "markings_error", "document_error"):
             st.session_state.pop(name, None)
         st.info("Başlamak için bir önerge PDF’si seçin.")
         st.stop()
     data = uploaded.getvalue()
     digest = hashlib.sha256(data).hexdigest()
     if st.session_state.get("document") != digest:
-        st.session_state.pop("markings", None)
-        st.session_state.pop("result", None)
-        st.session_state.pop("pages", None)
+        for name in ("markings", "markings_error", "result", "pages", "document_error"):
+            st.session_state.pop(name, None)
         st.session_state["document"] = digest
         try:
             if len(data) > MAX_BYTES:
                 raise HTTPException(413, "Dosya sınırı 12 MB.")
             st.session_state["pages"] = prepare_pdf(data)
         except HTTPException as exc:
-            st.error(exc.detail)
-            st.stop()
+            st.session_state["document_error"] = exc.detail
+    if st.session_state.get("document_error"):
+        st.error(st.session_state["document_error"])
+        st.stop()
     pages = st.session_state.get("pages")
     if not pages:
         st.error("PDF okunamadı. Başka bir dosya seçin.")
@@ -80,17 +126,19 @@ def main():
     if st.session_state.get("result") and st.session_state["result"].get("analysis_version") != ANALYSIS_VERSION:
         st.session_state.pop("result", None)
         st.session_state.pop("markings", None)
-        st.info("Bakan kontrolü güncellendi. Bu belge için incelemeyi yeniden başlatın.")
-    if st.button("İncelemeyi başlat", type="primary"):
+        st.session_state.pop("markings_error", None)
+        st.info("Analiz kuralları güncellendi. Bu belge için incelemeyi yeniden başlatın.")
+    if st.button("İncelemeyi başlat", type="primary", disabled=not key):
         st.session_state.pop("result", None)
         st.session_state.pop("markings", None)
+        st.session_state.pop("markings_error", None)
         try:
             with st.spinner("Belge okunuyor ve kontroller yapılıyor…"):
                 review = asyncio.run(analyze(pages, credential=key, model=setting("ONERGE_MODEL", "gpt-4.1")))
                 result = finalize(review, pages)
                 result["document_sha256"] = digest
                 st.session_state["result"] = result
-                st.session_state["markings"] = annotate_pdf(data, result["review"]["checks"])
+                create_markings(data, result)
         except APIStatusError as exc:
             st.error({401: "API anahtarı kabul edilmedi.", 403: "API erişimine izin verilmedi.",
                       429: "API bakiyesini ve kullanım sınırlarını kontrol edin.",
@@ -102,6 +150,12 @@ def main():
         except ValueError:
             st.error("Analiz yanıtı doğrulanamadı. Yeniden deneyin.")
     result = st.session_state.get("result")
+    if result and st.session_state.get("markings_error"):
+        st.warning(st.session_state["markings_error"])
+        if st.button("PDF işaretlerini yeniden oluştur"):
+            with st.spinner("PDF işaretleri oluşturuluyor…"):
+                create_markings(data, result)
+            st.rerun()
     markings = st.session_state.get("markings")
     if result:
         render_status_summary(result["review"]["checks"])
@@ -112,7 +166,8 @@ def main():
         for i, page in enumerate(pages, 1):
             image_tab, text_tab = st.tabs([f"Sayfa {i} · Belge", f"Sayfa {i} · Metin"])
             with image_tab:
-                st.image(markings["images"][i-1] if markings else base64.b64decode(page["image"]), caption=f"Sayfa {i} · Kırmızı alanlar şekil bulgularını gösterir." if result else f"Sayfa {i}")
+                has_marks = markings and any(location["page"] == i for location in markings["locations"])
+                st.image(markings["images"][i-1] if markings else base64.b64decode(page["image"]), caption=f"Sayfa {i} · Kırmızı alanlar şekil bulgularını gösterir." if has_marks else f"Sayfa {i}")
             with text_tab:
                 if result:
                     reading = next(p for p in result["review"]["pages"] if p["page"] == i)
@@ -154,7 +209,7 @@ def render_report(result):
     for warning in result["warnings"]:
         st.warning(warning)
     labels = {"hitap": "Hitap", "milletvekili": "Milletvekili", "secim_cevresi": "Seçim çevresi", "muhatap": "Muhatap", "talep": "Talep", "harf": "Harf / yazım"}
-    statuses = {"uygun": "Uygun", "uyari": "Uyarı", "belirsiz": "İnsan kontrolü gerekli", "kaynak_yok": "Kaynakta kayıt yok"}
+    statuses = {"uygun": "Uygun", "uyari": "Hatalı", "belirsiz": "Kontrol Gerekli", "kaynak_yok": "Kaynakta kayıt yok"}
     symbols = {"uygun": "✓", "uyari": "✕", "belirsiz": "?", "kaynak_yok": "—"}
     for number, check in enumerate(review["checks"], 1):
         state = check["status"]
@@ -184,8 +239,9 @@ def render_report(result):
                 st.text(uncertainty)
             if comparison["diff"]:
                 st.code(comparison["diff"], language="diff")
+    document_id = result.get("document_sha256", "belge")[:8]
     st.download_button("Raporu indir (JSON)", json.dumps(result, ensure_ascii=False, indent=2),
-                       file_name="onerge-raporu.json", mime="application/json")
+                       file_name=f"onerge-raporu-{RELEASE}-{document_id}.json", mime="application/json")
 
 
 if __name__ == "__main__":

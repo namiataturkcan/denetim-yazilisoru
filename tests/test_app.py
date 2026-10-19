@@ -47,7 +47,7 @@ def test_health_and_ui_without_key(client):
     assert h.status_code == 200
     assert h.json()["api_configured"] is False
     assert "no-store" in h.headers["cache-control"]
-    assert "Önerge İnceleme" in client.get("/").text
+    assert "Yazılı Soru Önergesi İncelemesi" in client.get("/").text
     assert client.get("/assets/app.js").status_code == 200
     assert client.get("/assets/rules.json").status_code == 404
     assert post(client, pdf()).status_code == 503

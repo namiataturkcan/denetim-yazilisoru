@@ -8,6 +8,7 @@ dependencies = [
     "openai>=2,<3",
     "pymupdf>=1.25,<2",
     "streamlit>=1.45,<2",
+    "openpyxl>=3.1.5,<4",
 ]
 
 [dependency-groups]

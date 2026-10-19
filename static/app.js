@@ -1,6 +1,6 @@
 const el = id => document.getElementById(id);
 const labels = {hitap:'Başkanlığa hitap',milletvekili:'Milletvekili adı',secim_cevresi:'Seçim çevresi',muhatap:'Muhatap adı ve unvanı',talep:'Talep ifadesi',harf:'Büyük–küçük harf'};
-const states = {uygun:'Uygun',uyari:'Şekil uyarısı',belirsiz:'İnsan kontrolü gerekli',kaynak_yok:'Kaynakta kayıt yok',uyumlu:'Okuma uyumlu',uyusmazlik:'Okuma uyuşmazlığı',ocr_yok:'PDF metin katmanı yok'};
+const states = {uygun:'Uygun',uyari:'Hatalı',belirsiz:'Kontrol Gerekli',kaynak_yok:'Kaynakta kayıt yok',uyumlu:'Okuma uyumlu',uyusmazlik:'Okuma uyuşmazlığı',ocr_yok:'Karşılaştırma metni yok'};
 let configured = false, busy = false, report = null, previewReady = false;
 function node(tag, text, className) { const n = document.createElement(tag); n.textContent = text; if(className)n.className=className; return n; }
 function status(text,error=false){el('status').textContent=text;el('status').className=error?'error':'';}
@@ -20,10 +20,19 @@ el('document').addEventListener('change',async()=>{
 });
 function render(data){
  const container=el('report');container.replaceChildren();
- container.append(node('p',data.review.summary||'Özet doğrulanamadı.','summary'));
+ const counters=node('div','','counters');
+ for(const [state,label] of [['uygun','✓ Uygun'],['uyari','✕ Sorunlu'],['belirsiz','? Kontrol Gerekli']]){
+   const count=data.review.checks.filter(c=>c.status===state).length;
+   const card=node('div','',`counter ${count?state:'neutral'}`);
+   card.append(node('span',label),node('strong',String(count)));counters.append(card);
+ }
+ container.append(counters,node('p','✓ Yeşil: Uygun · ✕ Kırmızı: Hatalı · ? Sarı: Kontrol Gerekli','muted'));
+ if(data.review.checks.length===6&&data.review.checks.every(c=>c.status==='uygun'))container.append(node('p','Şekli bakımdan tüm koşullara uygundur.','all-suitable'));
+ const summary=node('div','','summary-card');summary.append(node('h3','Önerge Özeti Önerisi'),node('p',data.review.summary||'Özet doğrulanamadı.','summary'));container.append(summary);
  for(const warning of data.warnings)container.append(node('p',warning,'notice'));
- for(const check of data.review.checks){const box=node('div','','check');box.append(node('h3',labels[check.kind]),node('span',states[check.status],'tag '+check.status),node('p','Sayfa '+check.page));if(check.quote)box.append(node('blockquote',check.quote));box.append(node('p',check.explanation));container.append(box);}
- for(const page of data.comparisons){const d=document.createElement('details');d.append(node('summary',`Sayfa ${page.page} · ${states[page.state]}`));const readings=node('div','','reading');for(const [title,text] of [['PDF metin katmanı',page.ocr||'Metin katmanı yok.'],['Görüntüden okuma',page.vision]]){const column=node('div','');column.append(node('h4',title),node('pre',text));readings.append(column);}d.append(readings);for(const uncertainty of page.uncertainties)d.append(node('p',uncertainty,'notice'));if(page.diff)d.append(node('pre',page.diff,'diff'));container.append(d);}
+ for(const [index,check] of data.review.checks.entries()){const box=node('div','',`check ${check.status}`);box.append(node('h3',`${index+1}. ${labels[check.kind]}`),node('span',states[check.status],'tag '+check.status),node('p','Sayfa '+check.page));if(check.quote)box.append(node('blockquote',check.quote));box.append(node('p',check.explanation));container.append(box);}
+ for(const page of data.comparisons){const d=document.createElement('details');d.append(node('summary',`Sayfa ${page.page} · ${states[page.state]}`));const readings=node('div','','reading');for(const [title,text] of [[page.ocr_source==='tesseract'?'Bağımsız OCR okuması':'PDF metin katmanı',page.ocr||'Karşılaştırma metni yok.'],['Görüntüden okuma',page.vision]]){const column=node('div','');column.append(node('h4',title),node('pre',text));readings.append(column);}d.append(readings);for(const uncertainty of page.uncertainties)d.append(node('p',uncertainty,'notice'));if(page.diff)d.append(node('pre',page.diff,'diff'));container.append(d);}
+ container.append(node('p','Kontrol sürümü: '+data.analysis_version,'hash'));
  container.append(node('p','Belge SHA-256: '+data.document_sha256,'hash'));
 }
 el('review').addEventListener('click',async()=>{

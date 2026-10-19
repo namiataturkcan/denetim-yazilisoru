@@ -3,15 +3,28 @@ import html
 import re
 
 import pymupdf
+from pdf_processing import render_scale, serialized_pdf_work
+
+
+def warning_findings(checks):
+    for number, check in enumerate(checks, 1):
+        if check['status'] == 'uyari':
+            for finding in check.get('findings', [check]):
+                if finding['status'] == 'uyari':
+                    yield number, finding
 
 
 def marked_text(text, checks, page):
     spans = []
-    for check in checks:
+    for _, check in warning_findings(checks):
         quote = check['quote'].strip()
         if check['page'] != page or check['status'] != 'uyari' or not quote:
             continue
         pattern = r'\s+'.join(re.escape(w) for w in quote.split())
+        if quote[0].isalnum():
+            pattern = r'(?<!\w)' + pattern
+        if quote[-1].isalnum():
+            pattern += r'(?!\w)'
         context = check.get('highlight_context', '')
         context_spans = []
         if context:
@@ -43,13 +56,15 @@ def find_quote(page, quote, context, textpage=None):
     return quads
 
 
+@serialized_pdf_work
 def annotate_pdf(data, checks):
     """Return a separate annotated PDF, preview images, and explicit unmapped findings."""
     images = []; locations = []; missing = []
     with pymupdf.open(stream=data, filetype='pdf') as doc:
         for page_index, page in enumerate(doc):
             ocr = None; ocr_attempted = False
-            for number, check in enumerate(checks, 1):
+            pending = []
+            for number, check in warning_findings(checks):
                 if check['page'] != page_index + 1 or check['status'] != 'uyari':
                     continue
                 quote = check['quote'].strip()
@@ -61,7 +76,8 @@ def annotate_pdf(data, checks):
                         # OCR is used only to locate findings, never as model input.
                         for language in ('tur+eng', 'eng'):
                             try:
-                                ocr = page.get_textpage_ocr(language=language, dpi=200, full=True)
+                                ocr = page.get_textpage_ocr(language=language,
+                                    dpi=max(1, round(72 * render_scale(page, 200 / 72))), full=True)
                                 break
                             except (RuntimeError, ValueError):
                                 continue
@@ -71,6 +87,9 @@ def annotate_pdf(data, checks):
                     missing.append({'number': number, 'page': page_index + 1,
                                     'reason': 'Belgede bulunmayan alan' if not quote else 'Alıntının sayfadaki konumu doğrulanamadı'})
                     continue
+                pending.append((number, check, quads))
+            # Locate all evidence before adding marks, so OCR sees the original page.
+            for number, check, quads in pending:
                 annotation = page.add_highlight_annot(quads)
                 annotation.set_colors(stroke=(0.95, 0.16, 0.2))
                 annotation.set_opacity(0.35)
@@ -82,7 +101,7 @@ def annotate_pdf(data, checks):
                     border.set_border(width=0.8)
                     border.update()
                 locations.append({'number': number, 'page': page_index + 1, 'rects': [list(q.rect) for q in quads]})
-            scale = min(2, 2200 / max(page.rect.width, page.rect.height))
+            scale = render_scale(page, 2)
             images.append(page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=False).tobytes('png'))
         output = doc.tobytes(garbage=3, deflate=True)
     return {'pdf': output, 'images': images, 'locations': locations, 'missing': missing}
