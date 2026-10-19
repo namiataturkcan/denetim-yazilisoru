@@ -213,13 +213,28 @@ def recipient_names(recipients):
     return [title[:-6] + 'Bakanlığı' if title.endswith('Bakanı') else title for title in recipients]
 
 
+def infer_term(records, first, last):
+    """Use source metadata without asking for a term or merging different terms."""
+    terms = {record.term for record in records}
+    if len(terms) == 1:
+        return next(iter(terms))
+    matching_terms = {record.term for record in records
+                      if record.number is not None and first <= record.number <= last}
+    if len(matching_terms) == 1:
+        return next(iter(matching_terms))
+    raise TableError('Bu aralık için kaynak dönem bilgisi tek bir döneme indirgenemedi. '
+                     'İşlem yapmak istediğiniz dönemin kayıtlarını ayrı bir tablo olarak yükleyin.')
+
+
 def build_report(records, first, last, term, recipients):
     first, last = parse_number(first), parse_number(last)
     if first > last:
         raise TableError('Başlangıç esas numarası bitiş numarasından büyük olamaz.')
+    if term is None:
+        term = infer_term(records, first, last)
     terms = {record.term for record in records}
     if term not in terms:
-        raise TableError('Listeden bir dönem seçin.')
+        raise TableError('Kaynakta belirtilen döneme ait kayıt bulunamadı.')
     reference = recipient_names(recipients)
     aliases = {}
     for title, display in zip(recipients, reference):
@@ -252,9 +267,10 @@ def build_report(records, first, last, term, recipients):
     present_recipients = [name for name in reference if name in observed_recipients]
     missing_recipients = [name for name in reference if name not in observed_recipients]
     other_recipients = [name for name in observed_recipients if name not in reference]
+    ranges = number_ranges(row['number'] for row in selected)
     return {'report_version': REPORT_VERSION, 'first': first, 'last': last, 'term': term, 'counts': dict(counts),
             'total': len(outcomes), 'selected_count': len(selected),
-            'ranges': number_ranges(row['number'] for row in selected),
+            'ranges': ranges, 'ranges_text': ';'.join(ranges),
             'ranges_by_status': {group: number_ranges(row['number'] for row in outcomes if row['group'] == group)
                                  for group in STATUS_LABELS},
             'present_recipients': present_recipients, 'missing_recipients': missing_recipients,
@@ -265,14 +281,14 @@ def build_report(records, first, last, term, recipients):
 
 
 def report_text(report):
-    lines = [f"Gelen Kağıt İşlemleri · {report['first']}–{report['last']}",
-             f"Dönem: {report['term'] or 'Kaynakta belirtilmemiş'}", '',
+    lines = [f"Gelen Kağıt İşlemleri · {report['first']}–{report['last']}", '',
              'Cevaplanmamış / cevap süresi devam eden esas numarası aralıkları:',
-             *report['ranges'], f"Toplam: {report['selected_count']} önerge.", '']
+             report['ranges_text'] or 'Yok', f"Toplam: {report['selected_count']} önerge.", '']
     for group, label in STATUS_LABELS.items():
         lines.append(f"{label}: {report['counts'].get(group, 0)}")
-    lines.extend(['', 'Bulunan muhataplar:', *report['present_recipients'], '',
-                  '18 muhataplık listede olup sonuçta bulunmayanlar:', *report['missing_recipients']])
+    lines.extend(['', f"Bulunan bakanlıklar ve muhataplar ({len(report['present_recipients'])}):",
+                  *report['present_recipients'], '',
+                  f"Listede bulunmayanlar ({len(report['missing_recipients'])}):", *report['missing_recipients']])
     if report['other_recipients']:
         lines.extend(['', 'Referans listesi dışında kalan muhataplar:', *report['other_recipients']])
     if report['absent_count']:

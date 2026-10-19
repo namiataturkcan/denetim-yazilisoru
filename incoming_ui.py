@@ -1,5 +1,6 @@
 """Streamlit view for incoming papers. All input stays in this user's session."""
 import hashlib
+from html import escape
 import json
 
 import streamlit as st
@@ -10,13 +11,21 @@ from incoming_papers import (TableError, STATUS_LABELS, REPORT_VERSION, build_re
 
 def _clear_table():
     for name in ('incoming_records', 'incoming_source', 'incoming_result', 'incoming_parse_error',
-                 'incoming_first', 'incoming_last', 'incoming_term', 'incoming_range_term', 'incoming_selection'):
+                 'incoming_selection'):
         st.session_state.pop(name, None)
 
 
 def render_incoming(recipients):
     reference_version = hashlib.sha256(json.dumps(list(recipients), ensure_ascii=False).encode()).hexdigest()[:12]
     st.caption('Excel’den veya yapıştırdığınız tablodan işlem yapılır. Bu bölüm API kullanmaz.')
+    st.subheader('1. Esas numarası aralığı')
+    left, right = st.columns(2)
+    first = left.number_input('Başlangıç esas numarası', min_value=1, max_value=999999999,
+                              value=None, step=1, placeholder='Örn. 45424', key='incoming_first')
+    last = right.number_input('Bitiş esas numarası', min_value=1, max_value=999999999,
+                             value=None, step=1, placeholder='Örn. 45530', key='incoming_last')
+    st.caption('İncelenecek aralığı elle girin. Başlangıç ve bitiş numaraları işleme dahildir.')
+    st.subheader('2. Veriyi ekleyin')
     mode = st.radio('Veri girişi', ['Excel yükle', 'Tablo yapıştır'], horizontal=True, key='incoming_mode')
     try:
         if mode == 'Excel yükle':
@@ -62,35 +71,20 @@ def render_incoming(recipients):
         st.error(str(exc))
         return
     records = st.session_state['incoming_records']
-    terms = sorted({record.term for record in records})
-    term = st.selectbox('Yasama dönemi', terms, index=0 if len(terms) == 1 else None,
-                        placeholder='İşlem yapılacak dönemi seçin', key='incoming_term',
-                        format_func=lambda value: value or 'Kaynakta dönem belirtilmemiş')
-    if term is None:
-        st.info('Farklı dönemlerin esas numaraları karışmaması için bir dönem seçin.')
-        return
-    if not term:
-        st.caption('Tabloda dönem bilgisi yok. Yapıştırdığınız kayıtların aynı döneme ait olduğundan emin olun.')
-    numbers = [record.number for record in records if record.term == term and record.number is not None]
-    if not numbers:
-        st.error('Bu dönemde geçerli esas numarası bulunamadı.')
-        return
-    if st.session_state.get('incoming_range_term') != (source, term):
-        st.session_state['incoming_first'] = min(numbers)
-        st.session_state['incoming_last'] = max(numbers)
-        st.session_state['incoming_range_term'] = (source, term)
-        st.session_state.pop('incoming_result', None)
-    left, right = st.columns(2)
-    first = left.number_input('Başlangıç esas numarası', min_value=1, max_value=999999999, step=1, key='incoming_first')
-    last = right.number_input('Bitiş esas numarası', min_value=1, max_value=999999999, step=1, key='incoming_last')
-    selection = (source, term, first, last)
+    selection = (source, first, last)
     if st.session_state.get('incoming_selection') != selection:
         st.session_state.pop('incoming_result', None)
     st.session_state['incoming_selection'] = selection
-    st.caption(f'{len(records):,} kaynak satırı okundu. Başlangıç ve bitiş numaraları işleme dahildir.')
-    if st.button('Listeyi oluştur', type='primary'):
+    st.caption(f'{len(records):,} kaynak satırı okundu.')
+    missing_bounds = first is None or last is None
+    reversed_bounds = not missing_bounds and first > last
+    if missing_bounds:
+        st.info('En üstteki başlangıç ve bitiş esas numaralarını girin.')
+    elif reversed_bounds:
+        st.error('Başlangıç esas numarası bitiş numarasından büyük olamaz.')
+    if st.button('Listeyi oluştur', type='primary', disabled=missing_bounds or reversed_bounds):
         try:
-            result = build_report(records, first, last, term, recipients)
+            result = build_report(records, first, last, None, recipients)
             result['source'] = source_label
             result['source_sha256'] = source[1]
             st.session_state['incoming_result'] = result
@@ -121,23 +115,29 @@ def render_incoming_report(result):
         st.caption(f"{result['duplicate_count']} yinelenen satır tekilleştirildi; aynı önerge bir kez sayıldı.")
     st.markdown('**Cevaplanmamış / cevap süresi devam eden esas numarası aralıkları**')
     if result['ranges']:
-        st.code('\n'.join(result['ranges']), language=None)
+        st.caption('Noktalı virgülle ayrılmış tek satır · sağ üstteki simgeden kopyalayabilirsiniz.')
+        st.code(result['ranges_text'], language=None, wrap_lines=True)
+        with st.expander('Aralıkları alt alta göster'):
+            st.code('\n'.join(result['ranges']), language=None)
     else:
         st.info('Bu aralıkta listeye alınacak cevaplanmamış kayıt bulunamadı.')
     for group in ('announced', 'pending'):
         with st.expander(f'{STATUS_LABELS[group]} · {counts.get(group, 0)} önerge'):
             st.code('\n'.join(result['ranges_by_status'][group]) or 'Yok', language=None)
-    left, right = st.columns(2)
+    left, right = st.columns([2, 1])
     with left:
-        st.markdown(f"**Bulunan muhataplar · {len(result['present_recipients'])}/18**")
-        st.dataframe([{'Muhatap': name, 'Önerge': result['recipient_counts'][name]}
-                      for name in result['present_recipients']], hide_index=True, width='stretch')
+        names = ''.join(f'<li>{escape(name)}</li>' for name in result['present_recipients'])
+        st.markdown('<section class="incoming-recipients found">'
+                    '<h3>Bulunan bakanlıklar ve muhataplar</h3>'
+                    f'<div class="recipient-count">{len(result["present_recipients"])}</div>'
+                    + (f'<ul>{names}</ul>' if names else '<p>Bu aralıkta bulunan muhatap yok.</p>')
+                    + '</section>', unsafe_allow_html=True)
     with right:
-        st.markdown(f"**Listede bulunmayan muhataplar · {len(result['missing_recipients'])}/18**")
-        if result['missing_recipients']:
-            st.write('\n'.join('- ' + name for name in result['missing_recipients']))
-        else:
-            st.success('18 muhatabın tamamı sonuç listesinde bulunuyor.')
+        names = ''.join(f'<li>{escape(name)}</li>' for name in result['missing_recipients'])
+        st.markdown('<section class="incoming-recipients missing">'
+                    f'<h3>Bulunmayanlar · {len(result["missing_recipients"])}</h3>'
+                    + (f'<ul>{names}</ul>' if names else '<p>Referans listesindeki tüm muhataplar bulunuyor.</p>')
+                    + '</section>', unsafe_allow_html=True)
     st.caption('Muhatap listeleri yalnızca cevaplanmamış / cevap süresi devam eden sonuçlara göre hesaplanır.')
     if result['other_recipients']:
         st.warning('Bazı muhataplar 18 muhataplık referans listesinde yok; önerge sayısına dahil edildi, aşağıda ayrıca gösteriliyor.')

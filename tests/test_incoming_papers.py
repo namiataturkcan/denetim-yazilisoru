@@ -52,6 +52,18 @@ def test_historic_conversation_single_answered_gap():
     assert result['selected_count'] == 68
 
 
+def test_semicolon_output_keeps_singletons_and_never_bridges_answered_gaps():
+    answered = {45494, 45513, 45524, 45526}
+    result = run([[n, 'Cevaplandı' if n in answered else PENDING, 'Adalet Bakanı']
+                  for n in range(45424, 45531)], 45424, 45530)
+    expected = '45424–45493;45495–45512;45514–45523;45525;45527–45530'
+    assert result['ranges_text'] == expected
+    assert expected in report_text(result).splitlines()
+    assert result['selected_count'] == 103
+    assert 'Bulunan bakanlıklar ve muhataplar (1):' in report_text(result)
+    assert 'Listede bulunmayanlar (17):' in report_text(result)
+
+
 def test_current_statuses_are_separate_and_late_answers_are_excluded():
     statuses = [ANNOUNCED, PENDING, 'Cevaplandı', 'Süresi Geçtikten Sonra Cevaplandı',
                 'Önerge Sahibi Tarafından Geri Alındı']
@@ -93,6 +105,27 @@ def test_terms_are_filtered_before_deduplication():
     assert result['present_recipients'] == ['Adalet Bakanlığı']
     with pytest.raises(TableError):
         run(rows, 1, 1)
+
+
+def test_term_is_inferred_from_source_or_selected_range():
+    header = ['Dönem Adı', 'Esas No', 'Son Durum', 'Muhatap Unvanı']
+    row = ['28.DÖNEM', 1, PENDING, 'Adalet Bakanı']
+    result = run([header, row], 1, 1, term=None)
+    assert result['term'] == '28. Dönem'
+    assert result['selected_count'] == 1
+    result = run([header, row, ['27.DÖNEM', 2, PENDING, 'İçişleri Bakanı']], 1, 1, term=None)
+    assert result['term'] == '28. Dönem'
+    assert result['selected_count'] == 1
+    assert run([[1, PENDING, 'Adalet Bakanı']], 1, 1, term=None)['term'] == ''
+
+
+@pytest.mark.parametrize('other_term', ['27.DÖNEM', ''])
+def test_auto_term_rejects_ambiguous_source_even_when_statuses_agree(other_term):
+    rows = [['Dönem Adı', 'Esas No', 'Son Durum', 'Muhatap Unvanı'],
+            ['28.DÖNEM', 1, PENDING, 'Adalet Bakanı'],
+            [other_term, 1, PENDING, 'Adalet Bakanı']]
+    with pytest.raises(TableError, match='ayrı bir tablo'):
+        run(rows, 1, 1, term=None)
 
 
 def test_excel_named_columns_in_arbitrary_order_and_extra_columns():
