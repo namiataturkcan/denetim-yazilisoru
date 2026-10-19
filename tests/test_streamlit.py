@@ -73,3 +73,16 @@ def test_upload_analysis_and_clear(monkeypatch):
         assert 'result' not in at.session_state
         assert 'pages' not in at.session_state
         assert 'markings' not in at.session_state
+
+
+def test_missing_source_card_is_gray_and_not_all_suitable():
+    from test_app import report
+    r=report().model_dump()
+    r['checks'][2]['status']='kaynak_yok'
+    r['checks'][2]['explanation']='Kaynakta kayıt yok.'
+    payload={'review':r,'warnings':[],'comparisons':[]}
+    at=AppTest.from_string('from streamlit_app import render_report, render_status_summary\n'+'result='+repr(payload)+'\nrender_status_summary(result["review"]["checks"])\nrender_report(result)').run()
+    assert not at.exception
+    assert not at.success
+    assert 'check-card kaynak_yok' in '\n'.join(x.value for x in at.markdown)
+    assert 'Kaynakta kayıt yok: 1' in at.caption[0].value

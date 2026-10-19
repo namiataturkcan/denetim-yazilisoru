@@ -134,6 +134,9 @@ def render_status_summary(checks):
     for col, label, status, count in zip(st.columns(3), ("✓ Uygun", "✕ Sorunlu", "? Kontrol Gerekli"), statuses, counts):
         tone = status if count else "neutral"
         col.markdown(f'<div class="status-card {tone}"><div>{label}</div><div class="status-count">{count}</div></div>', unsafe_allow_html=True)
+    missing_source = sum(c["status"] == "kaynak_yok" for c in checks)
+    if missing_source:
+        st.caption(f"Kaynakta kayıt yok: {missing_source} kontrol. Bu alanlar gri gösterilir; uygun sayılmaz.")
     if len(checks) == 6 and counts[0] == 6:
         st.success("Şekli bakımdan tüm koşullara uygundur.")
 
@@ -147,18 +150,18 @@ def render_report(result):
     for warning in result["warnings"]:
         st.warning(warning)
     labels = {"hitap": "Hitap", "milletvekili": "Milletvekili", "secim_cevresi": "Seçim çevresi", "muhatap": "Muhatap", "talep": "Talep", "harf": "Harf / yazım"}
-    statuses = {"uygun": "Uygun", "uyari": "Uyarı", "belirsiz": "İnsan kontrolü gerekli"}
-    symbols = {"uygun": "✓", "uyari": "✕", "belirsiz": "?"}
+    statuses = {"uygun": "Uygun", "uyari": "Uyarı", "belirsiz": "İnsan kontrolü gerekli", "kaynak_yok": "Kaynakta kayıt yok"}
+    symbols = {"uygun": "✓", "uyari": "✕", "belirsiz": "?", "kaynak_yok": "—"}
     for number, check in enumerate(review["checks"], 1):
         state = check["status"]
         quote = '<blockquote>' + html.escape(check["quote"]) + '</blockquote>' if check["quote"] else ''
         st.markdown(f'<div class="check-card {state}"><div class="check-heading"><span>{number}. {labels[check["kind"]]}</span><span>{symbols[state]} {statuses[state]}</span></div><p>Sayfa {check["page"]} · {html.escape(check["explanation"])}</p>{quote}</div>', unsafe_allow_html=True)
-    states = {"uyumlu": "Metinler uyumlu", "uyusmazlik": "Metinler farklı", "ocr_yok": "PDF metin katmanı yok", "belirsiz": "Okuma belirsiz"}
+    states = {"uyumlu": "Metinler uyumlu", "uyusmazlik": "Metinler farklı", "ocr_yok": "Karşılaştırma metni yok", "belirsiz": "Okuma belirsiz"}
     for comparison in result["comparisons"]:
         with st.expander(f"Sayfa {comparison['page']} — {states[comparison['state']]}"):
             st.text("Görüntüden okunan metin")
             st.text(comparison["vision"])
-            st.text("PDF metin katmanı")
+            st.text("Bağımsız OCR okuması" if comparison.get("ocr_source") == "tesseract" else "PDF metin katmanı")
             st.text(comparison["ocr"] or "Yok")
             for uncertainty in comparison["uncertainties"]:
                 st.text(uncertainty)

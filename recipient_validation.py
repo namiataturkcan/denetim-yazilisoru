@@ -29,7 +29,7 @@ def validate_recipient(review, recipients):
         check.explanation = 'Kullanıcının muhatap listesiyle karşılaştırılabilecek tek bir açık unvan–isim eşleşmesi doğrulanamadı; insan kontrolü gerekiyor.'
         return
     page, quote, actual, title, expected = candidates[0]
-    if page.uncertainties or '[OKUNAMADI]' in page.text:
+    if check.reading_uncertain or '[OKUNAMADI]' in quote:
         check.status = 'belirsiz'
         check.page = page.page
         check.quote = quote

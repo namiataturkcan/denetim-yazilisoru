@@ -27,3 +27,5 @@ h1,h2,h3 { color: #172b46; letter-spacing: -.025em; }
 .summary-title { font-weight: 700; color: #172b46; }
 .summary-card p { margin: 10px 0 0; white-space: pre-wrap; line-height: 1.6; }
 @media(max-width:700px) { .block-container { padding: 1rem; } .check-heading { flex-direction: column; gap: 3px; } }
+
+.check-card.kaynak_yok { border-color: #c6ced9; background: #edf0f4; color: #536176; }

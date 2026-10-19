@@ -7,6 +7,7 @@ def validate(text, uncertainties=None):
     r=report();r.pages[0].text=text;r.pages[0].uncertainties=uncertainties or []
     for c in r.checks:
         c.quote=text
+        c.reading_uncertain=bool(uncertainties) if c.kind == "muhatap" else False
     result=app.finalize(r,[{'ocr':text}])
     return next(c for c in result['review']['checks'] if c['kind']=='muhatap')
 

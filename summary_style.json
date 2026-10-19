@@ -1,0 +1,54 @@
+{
+  "source": {
+    "file": "KKBS_YazılıOnerge_Rapor_19-10-2026 09_27.xlsx",
+    "sha256": "8cdacaa52ce2be8fb8b2c974720f58ad79bfe48053e7cff97fbda34664b032c3",
+    "term": "28.DÖNEM",
+    "row_count": 50416,
+    "member_count": 312
+  },
+  "statistics": {
+    "count": 50416,
+    "median_words": 10.0,
+    "p90_words": 14,
+    "max_words": 31,
+    "over_10_words": 19766
+  },
+  "target_words": [
+    6,
+    14
+  ],
+  "max_words": 31,
+  "ending": "ilişkin",
+  "guidance": [
+    "Tek, kısa bir konu tamlaması yaz; soruları tek tek sıralama.",
+    "İddiaları olgu gibi sunma; metne uygunsa iddiasına/iddialara ilişkin kullan.",
+    "Talep, sayı, akıbet, çalışma veya sorun ifadelerini belgedeki asıl konuya göre seç.",
+    "Yer, kurum ve tarih yalnızca konuyu ayırt etmek için gerekliyse yer alsın.",
+    "Örneklerden yeni bilgi veya konu kopyalama; yalnızca üslubu örnek al.",
+    "Nötr bir dil kullan; değerlendirme, öneri veya cevap ekleme."
+  ],
+  "examples": [
+    "Bilecik Organize Sanayi Bölgesinde bulunan bir fabrikada sendikalı işçilerin hak ihlaline uğradıkları iddiasına ilişkin",
+    "Kocaeli Yüksek Güvenlikli Cezaevinde bulunan bir mahkumun tahliye edilmediği iddiasına ilişkin",
+    "itfaiye personelinin mali ve özlük haklarında iyileştirme yapılması talebine ilişkin",
+    "motosikletli kurye ölümlerine dair ulusal bir veri tabanı oluşturulması talebine ilişkin",
+    "Kütahya'nın Simav ilçesinde Bakanlığın yaptığı çalışmalara ilişkin",
+    "organize suç örgütleriyle mücadele konusunda yapılan çalışmalara ilişkin",
+    "2014'ten bu yana ataması yapılan hemşire sayısına ilişkin",
+    "2024 yılında Bursa'da faturasını ödeyemediği için doğal gazı kesilen abone sayısına ilişkin",
+    "Batı Antalya Havalimanı Projesi'nin akıbetine ilişkin",
+    "Çorum Merkez Karabürçek Köyü Damla Sulama Tesisi Projesi'nin akıbetine ilişkin",
+    "Kars ili Sarıkamış ilçesine bağlı Isısu köyünün yol ve altyapı sorununa ilişkin",
+    "Şanlıurfa'nın Batıkent TOKİ bölgesinde yaşanan ulaşım sorununa ilişkin",
+    "Burdur'un Bucak ilçesinde olası bir depreme karşı alınan önlemlere ilişkin",
+    "Ağrı ilinde aşırı sıcaklara karşı alınan önlemlere ilişkin",
+    "2019'dan bu yana sağlıkta şiddetle ilgili çeşitli verilere ilişkin",
+    "Diyarbakır'ın Kayapınar ilçesinin sosyo-ekonomik gelişmişlik düzeyine dair çeşitli verilere ilişkin",
+    "Antalya'nın Alanya ilçesinde bulunan bir mahallede faaliyet gösteren taş ocağının çevresel etkilerine ilişkin",
+    "Muş'un Varto ilçesine bağlı Çallıdere köyünde yürütülmesi planlanan jeotermal kaynak arama faaliyetlerinin çevresel etkilerine ilişkin",
+    "Burdur Yüksek Güvenlikli Kapalı Ceza İnfaz Kurumunda bulunan bir mahkumun sağlık durumuna ilişkin",
+    "Şırnak T Tipi Kapalı Cezaevinde bulunan bir mahkumun adil yargılanmadığı iddiasına ve sağlık durumuna ilişkin",
+    "Eylül 2024 tarihi itibarıyla kredi borcunu ödeyemeyen çiftçilere ilişkin",
+    "Adana ilindeki köy okullarının öğretmen ihtiyacına ilişkin"
+  ]
+}

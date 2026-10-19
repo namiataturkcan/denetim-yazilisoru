@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-16-user-rules",
+  "version": "2026-10-19-user-rules",
   "salutation": "Türkiye Büyük Millet Meclisi Başkanlığına",
   "recipients": {
     "Cumhurbaşkanı Yardımcısı": "Cevdet YILMAZ",
@@ -22,6 +22,5 @@
     "Ulaştırma ve Altyapı Bakanı": "Abdulkadir URALOĞLU"
   },
   "internal_rules": null,
-  "return_phrases": null,
-  "summary_style_examples": []
+  "return_phrases": null
 }

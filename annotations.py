@@ -12,7 +12,13 @@ def marked_text(text, checks, page):
         if check['page'] != page or check['status'] != 'uyari' or not quote:
             continue
         pattern = r'\s+'.join(re.escape(w) for w in quote.split())
-        spans.extend((m.start(), m.end()) for m in re.finditer(pattern, text))
+        context = check.get('highlight_context', '')
+        context_spans = []
+        if context:
+            context_pattern = r'\s+'.join(re.escape(w) for w in context.split())
+            context_spans = [(m.start(), m.end()) for m in re.finditer(context_pattern, text)]
+        spans.extend((m.start(), m.end()) for m in re.finditer(pattern, text)
+                     if not context or any(start <= m.start() and m.end() <= end for start, end in context_spans))
     merged = []
     for start, end in sorted(spans):
         if merged and start <= merged[-1][1]:
@@ -27,6 +33,16 @@ def marked_text(text, checks, page):
     return '<div class="document-text">' + ''.join(out) + '</div>'
 
 
+def find_quote(page, quote, context, textpage=None):
+    if not quote:
+        return []
+    quads = page.search_for(quote, quads=True, textpage=textpage)
+    if context:
+        anchors = page.search_for(context, quads=True, textpage=textpage)
+        quads = [q for q in quads if any((q.rect & a.rect).get_area() > q.rect.get_area() * 0.5 for a in anchors)]
+    return quads
+
+
 def annotate_pdf(data, checks):
     """Return a separate annotated PDF, preview images, and explicit unmapped findings."""
     images = []; locations = []; missing = []
@@ -37,7 +53,8 @@ def annotate_pdf(data, checks):
                 if check['page'] != page_index + 1 or check['status'] != 'uyari':
                     continue
                 quote = check['quote'].strip()
-                quads = page.search_for(quote, quads=True) if quote else []
+                context = check.get('highlight_context', '')
+                quads = find_quote(page, quote, context)
                 if quote and not quads:
                     if not ocr_attempted:
                         ocr_attempted = True
@@ -49,7 +66,7 @@ def annotate_pdf(data, checks):
                             except (RuntimeError, ValueError):
                                 continue
                     if ocr is not None:
-                        quads = page.search_for(quote, quads=True, textpage=ocr)
+                        quads = find_quote(page, quote, context, textpage=ocr)
                 if not quads:
                     missing.append({'number': number, 'page': page_index + 1,
                                     'reason': 'Belgede bulunmayan alan' if not quote else 'Alıntının sayfadaki konumu doğrulanamadı'})

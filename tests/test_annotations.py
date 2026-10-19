@@ -49,3 +49,18 @@ def test_missing_ocr_is_explicit(monkeypatch):
     result=annotate_pdf(data,[check('not found')])
     assert not result['locations']
     assert len(result['missing']) == 1
+
+
+def test_context_avoids_marking_province_in_body():
+    finding=check('Dersim')
+    finding['highlight_context']='Ayten KORDU\nDersim Milletvekili'
+    text='Dersim hakkında bir soru.\nAyten KORDU\nDersim Milletvekili'
+    markup=marked_text(text,[finding],1)
+    assert markup.count('<mark ')==1
+    assert 'Dersim hakkında' in markup
+    with pymupdf.open() as d:
+        p=d.new_page();p.insert_text((72,72),text,fontsize=12)
+        data=d.tobytes()
+    result=annotate_pdf(data,[finding])
+    assert len(result['locations'][0]['rects'])==1
+    assert result['locations'][0]['rects'][0][1]>80

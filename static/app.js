@@ -1,6 +1,6 @@
 const el = id => document.getElementById(id);
 const labels = {hitap:'Başkanlığa hitap',milletvekili:'Milletvekili adı',secim_cevresi:'Seçim çevresi',muhatap:'Muhatap adı ve unvanı',talep:'Talep ifadesi',harf:'Büyük–küçük harf'};
-const states = {uygun:'Uygun',uyari:'Şekil uyarısı',belirsiz:'İnsan kontrolü gerekli',uyumlu:'Okuma uyumlu',uyusmazlik:'Okuma uyuşmazlığı',ocr_yok:'PDF metin katmanı yok'};
+const states = {uygun:'Uygun',uyari:'Şekil uyarısı',belirsiz:'İnsan kontrolü gerekli',kaynak_yok:'Kaynakta kayıt yok',uyumlu:'Okuma uyumlu',uyusmazlik:'Okuma uyuşmazlığı',ocr_yok:'PDF metin katmanı yok'};
 let configured = false, busy = false, report = null, previewReady = false;
 function node(tag, text, className) { const n = document.createElement(tag); n.textContent = text; if(className)n.className=className; return n; }
 function status(text,error=false){el('status').textContent=text;el('status').className=error?'error':'';}
