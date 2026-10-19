@@ -14,7 +14,7 @@ import streamlit as st
 from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
-from app import MAX_BYTES, analyze, finalize, prepare_pdf
+from app import ANALYSIS_VERSION, MAX_BYTES, analyze, finalize, prepare_pdf
 
 
 def setting(name, default=""):
@@ -77,6 +77,10 @@ def main():
     if not pages:
         st.error("PDF okunamadı. Başka bir dosya seçin.")
         st.stop()
+    if st.session_state.get("result") and st.session_state["result"].get("analysis_version") != ANALYSIS_VERSION:
+        st.session_state.pop("result", None)
+        st.session_state.pop("markings", None)
+        st.info("Bakan kontrolü güncellendi. Bu belge için incelemeyi yeniden başlatın.")
     if st.button("İncelemeyi başlat", type="primary"):
         st.session_state.pop("result", None)
         st.session_state.pop("markings", None)
@@ -156,6 +160,19 @@ def render_report(result):
         state = check["status"]
         quote = '<blockquote>' + html.escape(check["quote"]) + '</blockquote>' if check["quote"] else ''
         st.markdown(f'<div class="check-card {state}"><div class="check-heading"><span>{number}. {labels[check["kind"]]}</span><span>{symbols[state]} {statuses[state]}</span></div><p>Sayfa {check["page"]} · {html.escape(check["explanation"])}</p>{quote}</div>', unsafe_allow_html=True)
+    audit = result.get("recipient_audit")
+    if audit:
+        with st.expander("Bakan kontrolünde kullanılan liste ve okumalar"):
+            st.caption("Bu raporda yalnızca aşağıdaki kullanıcı listesi kullanıldı. Excel’deki geçmiş bakan isimleri kullanılmaz.")
+            for title, name in audit["reference"].items():
+                st.text(f"{title} — {name}")
+            for label, records in (("Görüntüden okunan muhatap", audit["vision"]), ("PDF/OCR üzerinden okunan muhatap", audit["comparison"])):
+                st.write(label)
+                for entry in records:
+                    st.text(f"Sayfa {entry['page']}: {entry['title']} — {entry['name']}")
+                if not records:
+                    st.text("Bu okumada açık bir muhatap eşleşmesi bulunamadı.")
+            st.caption("Kontrol sürümü: " + result.get("analysis_version", "belirtilmemiş"))
     states = {"uyumlu": "Metinler uyumlu", "uyusmazlik": "Metinler farklı", "ocr_yok": "Karşılaştırma metni yok", "belirsiz": "Okuma belirsiz"}
     for comparison in result["comparisons"]:
         with st.expander(f"Sayfa {comparison['page']} — {states[comparison['state']]}"):

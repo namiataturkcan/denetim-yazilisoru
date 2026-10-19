@@ -152,6 +152,8 @@ def test_full_http_pipeline_with_mocked_openai(client, monkeypatch, key_name):
     assert response.json()["document_sha256"] == hashlib.sha256(data).hexdigest()
     assert response.json()["comparisons"][0]["state"] == "uyusmazlik"
     assert response.json()["internal_rules"] == "tanımlanmadı"
+    assert "Mustafa ÇİFTÇİ" not in captured[0]["instructions"]
+    assert "Akın GÜRLEK" not in captured[0]["instructions"]
     assert captured[0]["store"] is False
     assert captured[0]["text"]["format"]["strict"] is True
     assert "Reference text 10" not in json.dumps(captured[0])

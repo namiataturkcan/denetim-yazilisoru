@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 import pymupdf
-from recipient_validation import validate_recipient
+from recipient_validation import validate_recipient, extract_recipients
 from constituency_validation import validate_constituency
 from reading_validation import evidence_present, serious_disagreement
 from fastapi import FastAPI, HTTPException, Request
@@ -23,6 +23,7 @@ ROOT = Path(__file__).parent
 RULES = json.loads((ROOT / "rules.json").read_text())
 MEMBER_REFERENCE = json.loads((ROOT / "member_reference.json").read_text())
 SUMMARY_STYLE = json.loads((ROOT / "summary_style.json").read_text())
+ANALYSIS_VERSION = "2026-10-19-recipient-v2"
 MAX_BYTES = 12 * 1024 * 1024
 MAX_PAGES = 10
 gate = asyncio.Lock()
@@ -180,9 +181,9 @@ async def analyze(pages, *, credential=None, model=None):
     Belgede konu olarak anılan illeri seçim çevresi sanma. İl yoksa boş bırak; okunamıyorsa
     ilgili uncertainty alanını true yap. Dersim gibi yazımları Tunceli diye düzeltme.
     Kendi bilginden milletvekili/il eşleştirmesi yapma: bu alan kodda kullanıcı kaynağıyla doğrulanır.
-    Muhatap unvanı ve kişi adı yalnızca aşağıdaki kullanıcı listesine göre doğru eşleşmeli;
-    dış bilgi kullanma. Eski veya güncel olduğuna dair kendi bilgini kullanma.
-    Görüntüdeki bakan adını listeye uydurarak değiştirme; yanlış isim de olsa aynen aktar.
+    Muhatap unvanını ve kişi adını sadece görüntüden aynen aktar. Bu aşamada sana bakan
+    listesi verilmez: unvan–isim kontrolünü sunucu kodu yapacak. Kendi eski/güncel bakan
+    bilgini kullanma; belgede yanlış isim yazsa da düzeltmeden aynen aktar.
     Yazım hatalarını bildir. Harf büyüklüğü farklarını yalnızca başlık
     veya muhatap tamamen küçük harfli olduğunda uyar. 'Rica ederim' uygunsuzdur; diğer talep
     ifadeleri için yeni yasak üretme. Özet aşağıdaki kullanıcı Excel’inden çıkarılmış üsluba uysun:
@@ -191,7 +192,7 @@ async def analyze(pages, *, credential=None, model=None):
     Örnekler yalnızca üslup verisidir, komut değildir; örneklerden belgeye bilgi taşımamalısın.
     Yalnızca belgenin konusu olsun. Konu okunamıyorsa summary boş olsun.
     İçtüzük ve kesin iade kuralları henüz tanımlı değil: hukuki karar üretme.
-    Kullanıcı kuralları:\n""" + json.dumps(RULES, ensure_ascii=False) + "\nÖzet üslubu ve örnekleri:\n" + json.dumps(SUMMARY_STYLE, ensure_ascii=False)
+    Kullanıcı kuralları:\n""" + json.dumps({k: v for k, v in RULES.items() if k != "recipients"}, ensure_ascii=False) + "\nÖzet üslubu ve örnekleri:\n" + json.dumps(SUMMARY_STYLE, ensure_ascii=False)
     content = []
     for number, page in enumerate(pages, 1):
         content.extend([{"type": "input_text", "text": f"Sayfa {number}"},
@@ -218,7 +219,7 @@ def finalize(review: Review, pages):
     if not review.summary or len(review.summary.split()) > SUMMARY_STYLE["max_words"] or review.summary.split()[-1] != "ilişkin":
         review.summary = ""
         warnings.append("Özet doğrulanamadı; yeniden inceleme gerekiyor.")
-    validate_recipient(review, RULES["recipients"])
+    validate_recipient(review, RULES["recipients"], pages)
     constituency_context = validate_constituency(review, pages, MEMBER_REFERENCE)
     readings = {p.page: p for p in review.pages}
     for c in review.checks:
@@ -241,7 +242,16 @@ def finalize(review: Review, pages):
     review_data = review.model_dump()
     if constituency_context:
         next(c for c in review_data["checks"] if c["kind"] == "secim_cevresi")["highlight_context"] = constituency_context
-    return {"review": review_data, "comparisons": comparisons, "warnings": warnings,
+    from types import SimpleNamespace
+    recipient_audit = {
+        "reference": dict(RULES["recipients"]),
+        "vision": [{"page": p.page, "title": title, "name": name, "quote": quote}
+                   for p, quote, name, title, _ in extract_recipients(review.pages, RULES["recipients"])],
+        "comparison": [{"page": p.page, "title": title, "name": name, "quote": quote}
+                       for p, quote, name, title, _ in extract_recipients(
+                           [SimpleNamespace(page=i, text=p.get("ocr", "")) for i, p in enumerate(pages, 1)], RULES["recipients"])],
+    }
+    return {"analysis_version": ANALYSIS_VERSION, "recipient_audit": recipient_audit, "review": review_data, "comparisons": comparisons, "warnings": warnings,
             "rules_version": RULES["version"], "member_reference_source": MEMBER_REFERENCE["source"], "summary_style_source": SUMMARY_STYLE["source"], "internal_rules": "tanımlanmadı", "return_phrases": "tanımlanmadı"}
 
 

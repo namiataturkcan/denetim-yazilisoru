@@ -70,3 +70,44 @@ def test_unverified_model_warning_is_not_list_verification():
     c.status='uyari'
     result=app.finalize(r,[{'ocr':''}])
     assert next(c for c in result['review']['checks'] if c['kind']=='muhatap')['status']=='belirsiz'
+
+
+def test_addressee_conflict_is_not_hidden_by_name_elsewhere():
+    r=report()
+    r.pages[0].text='İçişleri Bakanı Mustafa Çiftçi tarafından cevaplandırılması. Ek bilgiler.'
+    for c in r.checks:
+        c.quote=r.pages[0].text
+    ocr='İçişleri Bakanı Ali Yerlikaya tarafından cevaplandırılması. Konuşmada İçişleri Bakanı Mustafa Çiftçi adı anılmıştır.'
+    result=app.finalize(r,[{'ocr':ocr}])
+    check=next(c for c in result['review']['checks'] if c['kind']=='muhatap')
+    assert check['status']=='belirsiz'
+    assert 'Ali Yerlikaya' in check['explanation']
+    assert 'Mustafa Çiftçi' in check['explanation']
+    assert result['recipient_audit']['vision'][0]['name']=='Mustafa Çiftçi'
+    assert result['recipient_audit']['comparison'][0]['name']=='Ali Yerlikaya'
+
+
+def test_confirmed_reference_is_recorded_in_report():
+    result=app.finalize(report(),[{'ocr':''}])
+    reference=result['recipient_audit']['reference']
+    assert reference['İçişleri Bakanı']=='Mustafa ÇİFTÇİ'
+    assert reference['Adalet Bakanı']=='Akın GÜRLEK'
+    assert result['analysis_version']==app.ANALYSIS_VERSION
+
+
+@pytest.mark.parametrize('title,old_name,expected',[
+    ('İçişleri Bakanı','Ali YERLİKAYA','Mustafa ÇİFTÇİ'),
+    ('Adalet Bakanı','Yılmaz TUNÇ','Akın GÜRLEK')])
+def test_both_explicitly_reconfirmed_ministers(title,old_name,expected):
+    c=validate(f'{title} {old_name} tarafından cevaplandırılmasını arz ederim.')
+    assert c['status']=='uyari'
+    assert expected in c['explanation']
+
+
+def test_conflicting_addressees_in_comparison_are_not_green():
+    r=report();r.pages[0].text='İçişleri Bakanı Mustafa Çiftçi tarafından cevaplandırılması.'
+    for c in r.checks:
+        c.quote=r.pages[0].text
+    ocr=r.pages[0].text+' İçişleri Bakanı Ali Yerlikaya tarafından cevaplandırılması.'
+    c=next(c for c in app.finalize(r,[{'ocr':ocr}])['review']['checks'] if c['kind']=='muhatap')
+    assert c['status']=='belirsiz'

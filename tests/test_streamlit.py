@@ -68,6 +68,11 @@ def test_upload_analysis_and_clear(monkeypatch):
         assert 'check-card uyari' in rendered
         assert 'check-card uygun' in rendered
         assert '<mark class="issue-text">Reference text 10</mark>' in rendered
+        at.session_state['result']['analysis_version']='old-version'
+        at.run()
+        assert 'result' not in at.session_state
+        assert 'markings' not in at.session_state
+        assert any('Bakan kontrolü güncellendi' in x.value for x in at.info)
     with patch('streamlit.file_uploader', return_value=None):
         at.run()
         assert 'result' not in at.session_state
