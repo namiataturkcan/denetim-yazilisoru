@@ -55,14 +55,18 @@ def render_incoming(recipients):
             source = (mode, hashlib.sha256(text.encode()).hexdigest(), REPORT_VERSION, reference_version)
             loader = lambda: read_paste(text)
             source_label = 'Yapıştırılan tablo'
-        if st.session_state.get('incoming_source') != source:
+        loaded = ('incoming_records' in st.session_state
+                  or bool(st.session_state.get('incoming_parse_error')))
+        if st.session_state.get('incoming_source') != source or not loaded:
             _clear_table()
-            st.session_state['incoming_source'] = source
             with st.spinner('Tablo okunuyor…'):
                 try:
                     st.session_state['incoming_records'] = loader()
                 except TableError as exc:
                     st.session_state['incoming_parse_error'] = str(exc)
+                # Commit the source only after reading finishes. Streamlit can
+                # interrupt at any widget/session access and rerun the script.
+                st.session_state['incoming_source'] = source
         if st.session_state.get('incoming_parse_error'):
             st.error(st.session_state['incoming_parse_error'])
             return

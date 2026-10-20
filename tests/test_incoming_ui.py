@@ -1,5 +1,9 @@
 from unittest.mock import patch
 
+import pytest
+import streamlit as st
+
+from incoming_papers import read_excel, read_paste
 from test_streamlit import configured
 from test_incoming_papers import PENDING, workbook
 
@@ -20,6 +24,49 @@ def enter_range(at, first, last):
     at.number_input[0].set_value(first)
     at.number_input[1].set_value(last).run()
     assert not at.exception
+
+
+@pytest.mark.parametrize('mode', ['Excel yükle', 'Tablo yapıştır'])
+def test_interrupted_read_retries_instead_of_trusting_incomplete_session(mode, monkeypatch):
+    data = workbook([['Esas No', 'Son Durum', 'Muhatap Unvanı'], [5, PENDING, 'Adalet Bakanı']])
+
+    class Upload:
+        name = 'test.xlsx'
+        def getvalue(self): return data
+
+    original = read_excel if mode == 'Excel yükle' else read_paste
+    calls = []
+
+    def interrupted_once(*args):
+        calls.append(args)
+        if len(calls) == 1:
+            # A widget interaction can interrupt the script while a file is loading.
+            st.rerun()
+        return original(*args)
+
+    at = login(configured(monkeypatch, module='incoming'))
+    enter_range(at, 5, 5)
+    if mode == 'Tablo yapıştır':
+        at.radio[0].set_value(mode).run()
+    loader_name = 'read_excel' if mode == 'Excel yükle' else 'read_paste'
+    with patch('streamlit.file_uploader', return_value=Upload()), \
+         patch('incoming_ui.' + loader_name, side_effect=interrupted_once):
+        if mode == 'Excel yükle':
+            at.run()
+        else:
+            at.text_area[0].set_value(f'5\t{PENDING}\tAdalet Bakanı').run()
+        assert not at.exception
+        assert len(calls) == 2
+        click(at, 'Listeyi oluştur')
+        assert at.session_state['incoming_result']['present_recipients'] == ['Adalet Bakanlığı']
+        # Recover sessions left incomplete by an older deployed version too.
+        del at.session_state['incoming_records']
+        at.run()
+        assert not at.exception
+        assert len(calls) == 3
+        assert 'incoming_result' not in at.session_state
+        click(at, 'Listeyi oluştur')
+        assert at.session_state['incoming_result']['selected_count'] == 1
 
 
 def test_home_routes_to_both_modules_and_returns(monkeypatch):
