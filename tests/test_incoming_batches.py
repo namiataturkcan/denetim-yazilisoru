@@ -29,12 +29,32 @@ def test_exact_kkbs_example_and_export_repeat_singletons_with_ascii_hyphens():
     assert number_ranges([999999999]) == ['999999999-999999999']
 
 
-def test_batches_merge_adjacent_and_overlapping_selected_numbers_without_filling_gaps():
+def test_batches_keep_each_query_intact_including_overlapping_numbers():
     batches = add_batch([], query(1, 4, {1, 3, 4}))
     batches = add_batch(batches, query(3, 7, {3, 4, 5, 7}))
     batches = add_batch(batches, query(10, 11, {10}))
-    assert combined_batch_ranges(batches) == ['1-1', '3-5', '7-7', '10-10']
+    assert combined_batch_ranges(batches) == ['1-1', '3-4', '3-5', '7-7', '10-10']
     assert len({n for b in batches for n in b['numbers']}) == 6
+
+
+def test_adjacent_packets_keep_user_example_boundary_in_both_outputs():
+    first = query(50000, 50100, set(range(50000, 50101)) - {50014, 50059})
+    second = query(50101, 50200, set(range(50101, 50201)))
+    batches = add_batch(add_batch([], first), second)
+    ranges = combined_batch_ranges(batches)
+    assert ';'.join(ranges) == '50000-50013;50015-50058;50060-50100;50101-50200'
+    assert '\n'.join(ranges) == '50000-50013\n50015-50058\n50060-50100\n50101-50200'
+
+
+def test_snapshot_keeps_insertion_order_and_is_independent_of_later_query_changes():
+    high = query(11, 12, {11, 12})
+    batches = add_batch([], high)
+    high['ranges'].clear()
+    batches = add_batch(batches, query(9, 10, {9, 10}))
+    assert combined_batch_ranges(batches) == ['11-12', '9-10']
+    updated = add_batch(batches, query(11, 12, {12}))
+    assert combined_batch_ranges(updated) == ['12-12', '9-10']
+    assert combined_batch_ranges(batches) == ['11-12', '9-10']
 
 
 def test_readding_same_query_updates_snapshot_instead_of_duplicating_it():

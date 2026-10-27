@@ -247,12 +247,13 @@ def format_ranges(ranges):
 
 
 def add_batch(batches, report):
-    """Save a query snapshot without duplicating numbers or mixing workflows/terms."""
+    """Save each query's ranges verbatim without mixing workflows or terms."""
     if not report['selected_count']:
         raise TableError('Bu sorguda birleşik listeye eklenecek önerge yok.')
     batch = {field: report[field] for field in
              ('stage', 'term', 'first', 'last', 'assessment_complete', 'report_version')}
     batch['source'] = report.get('source', 'Tablo')
+    batch['ranges'] = list(report['ranges'])
     batch['numbers'] = [row['number'] for row in report['rows']
                         if row['group'] == WORKFLOW_STAGES[report['stage']]['group']]
     batch['id'] = f"{report['term']}:{report['first']}:{report['last']}"
@@ -280,8 +281,8 @@ def add_batch(batches, report):
 
 
 def combined_batch_ranges(batches):
-    """Union only observed selected numbers; never fill gaps between queries."""
-    return number_ranges(number for batch in batches for number in batch['numbers'])
+    """Append saved query outputs in insertion order, preserving every boundary."""
+    return [interval for batch in batches for interval in batch['ranges']]
 
 
 def absent_ranges(present, first, last):

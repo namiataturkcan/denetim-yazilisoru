@@ -227,12 +227,17 @@ def render_batch_list(stage):
                    'Bu grupları yeniden sorgulayıp ekleyin veya listeden çıkarın.')
     else:
         ranges = combined_batch_ranges(batches)
-        count = len({number for batch in batches for number in batch['numbers']})
+        count = sum(len(batch['numbers']) for batch in batches)
         st.markdown(f'**{len(batches)} sorgu · {count} önerge**')
+        unique_count = len({number for batch in batches for number in batch['numbers']})
+        if unique_count != count:
+            st.caption(f'{unique_count} farklı önerge var. Örtüşen sorgulardaki tekrarlar, '
+                       'her sorgunun sonucu aynen korunduğu için listede bırakıldı.')
         if any(not batch['assessment_complete'] for batch in batches):
             st.warning('Kontrol gerektiren sorgular eklendi. Bu liste yalnızca o sorgularda '
                        'seçilebilen numaraları içerir; kaynak uyarılarını gidermeden tam liste olarak kullanmayın.')
-        st.caption('Tekrarlanan numaralar bir kez alınır; ardışık numaralar birleştirilir. '
+        st.caption('Sorgu sonuçları eklediğiniz sırayla, aralarına noktalı virgül konularak aynen eklenir. '
+                   'Farklı sorguların aralıkları birleştirilmez. '
                    'Tek numaralar da 44613-44613 biçimindedir.')
         text = ';'.join(ranges)
         st.code(text, language=None, wrap_lines=True)
