@@ -83,6 +83,34 @@ def test_upload_analysis_and_clear(monkeypatch):
         assert 'markings' not in at.session_state
 
 
+def test_interrupted_pdf_preparation_recovers_without_api_call(monkeypatch):
+    import streamlit as st
+    from app import prepare_pdf
+    from test_app import pdf
+    data = pdf()
+
+    class Upload:
+        def getvalue(self): return data
+
+    calls = []
+    def interrupted_once(data):
+        calls.append(1)
+        if len(calls) == 1:
+            st.rerun()
+        return prepare_pdf(data)
+
+    at = configured(monkeypatch)
+    with patch('streamlit.file_uploader', return_value=Upload()), \
+         patch('app.prepare_pdf', side_effect=interrupted_once), \
+         patch('app.analyze', side_effect=AssertionError('No analysis requested')):
+        at.run()
+        at.text_input[0].set_value('test-password-only')
+        at.button[0].click().run()
+        assert not at.exception
+        assert len(calls) == 2
+        assert len(at.session_state['pages']) == 1
+
+
 def test_missing_source_card_is_gray_and_not_all_suitable():
     from test_app import report
     r=report().model_dump()

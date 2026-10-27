@@ -24,7 +24,7 @@ ROOT = Path(__file__).parent
 RULES = json.loads((ROOT / "rules.json").read_text())
 MEMBER_REFERENCE = json.loads((ROOT / "member_reference.json").read_text())
 SUMMARY_STYLE = json.loads((ROOT / "summary_style.json").read_text())
-RELEASE = "2026.10.20.1"
+RELEASE = "2026.10.27.1"
 # Changes to either the validation code or the user's sources invalidate old reports.
 _revision_files = ("app.py", "reading_validation.py", "recipient_validation.py",
                    "constituency_validation.py", "annotations.py", "pdf_processing.py",

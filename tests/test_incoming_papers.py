@@ -23,8 +23,8 @@ def workbook(rows, sheet='Rapor'):
     return out.getvalue()
 
 
-def run(rows, first=1, last=5, term=''):
-    return build_report(read_records(rows), first, last, term, RULES['recipients'])
+def run(rows, first=1, last=5, term='', stage='prepare'):
+    return build_report(read_records(rows), first, last, term, RULES['recipients'], stage=stage)
 
 
 def test_reference_conversation_range_and_18_recipient_difference():
@@ -37,8 +37,8 @@ def test_reference_conversation_range_and_18_recipient_difference():
     assert result['total'] == 110
     assert result['selected_count'] == 97
     assert result['counts'] == {'pending': 97, 'answered': 13}
-    assert result['ranges'] == ['49220–49232', '49234', '49236–49268', '49271–49275',
-                                '49277–49289', '49293–49295', '49298–49301', '49305–49329']
+    assert result['ranges'] == ['49220-49232', '49234-49234', '49236-49268', '49271-49275',
+                                '49277-49289', '49293-49295', '49298-49301', '49305-49329']
     assert result['missing_recipients'] == ['Dışişleri Bakanlığı', 'Millî Savunma Bakanlığı']
     assert len(result['present_recipients']) == 16
     assert not result['absent_count']
@@ -47,8 +47,8 @@ def test_reference_conversation_range_and_18_recipient_difference():
 
 def test_historic_conversation_single_answered_gap():
     result = run([[n, 'Cevaplandı' if n == 45694 else ANNOUNCED, 'ADALET BAKANI']
-                  for n in range(45628, 45697)], 45628, 45696)
-    assert result['ranges'] == ['45628–45693', '45695–45696']
+                  for n in range(45628, 45697)], 45628, 45696, stage='verify')
+    assert result['ranges'] == ['45628-45693', '45695-45696']
     assert result['selected_count'] == 68
 
 
@@ -56,7 +56,7 @@ def test_semicolon_output_keeps_singletons_and_never_bridges_answered_gaps():
     answered = {45494, 45513, 45524, 45526}
     result = run([[n, 'Cevaplandı' if n in answered else PENDING, 'Adalet Bakanı']
                   for n in range(45424, 45531)], 45424, 45530)
-    expected = '45424–45493;45495–45512;45514–45523;45525;45527–45530'
+    expected = '45424-45493;45495-45512;45514-45523;45525-45525;45527-45530'
     assert result['ranges_text'] == expected
     assert expected in report_text(result).splitlines()
     assert result['selected_count'] == 103
@@ -68,18 +68,21 @@ def test_current_statuses_are_separate_and_late_answers_are_excluded():
     statuses = [ANNOUNCED, PENDING, 'Cevaplandı', 'Süresi Geçtikten Sonra Cevaplandı',
                 'Önerge Sahibi Tarafından Geri Alındı']
     result = run([[index, status, 'İÇİŞLERİ BAKANI'] for index, status in enumerate(statuses, 1)])
-    assert result['selected_count'] == 2
+    assert result['selected_count'] == 1
+    assert result['ranges'] == ['2-2']
+    verified = run([[index, status, 'İÇİŞLERİ BAKANI'] for index, status in enumerate(statuses, 1)], stage='verify')
+    assert verified['ranges'] == ['1-1']
     assert result['counts'] == {'announced': 1, 'pending': 1, 'answered': 2, 'withdrawn': 1}
-    assert result['ranges_by_status']['announced'] == ['1']
-    assert result['ranges_by_status']['pending'] == ['2']
+    assert result['ranges_by_status']['announced'] == ['1-1']
+    assert result['ranges_by_status']['pending'] == ['2-2']
 
 
 def test_missing_numbers_unknown_statuses_and_unknown_recipients_are_explicit():
     result = run([[1, ANNOUNCED, 'TBMM Başkanı'], [3, 'Bilinmeyen yeni durum', 'Adalet Bakanı'],
-                  ['hatalı numara', PENDING, 'Adalet Bakanı']])
+                  ['hatalı numara', PENDING, 'Adalet Bakanı']], stage='verify')
     assert result['selected_count'] == 1
     assert result['absent_count'] == 3
-    assert result['absent_ranges'] == ['2', '4–5']
+    assert result['absent_ranges'] == ['2-2', '4-5']
     assert result['counts']['unknown'] == 1
     assert result['other_recipients'] == ['TBMM Başkanı']
     assert len(result['missing_recipients']) == 18
@@ -174,8 +177,8 @@ def test_duplicate_headers_and_invalid_workbooks_are_rejected():
 def test_bounds_and_compression_are_inclusive_and_never_expand_missing_range():
     result = run([[5, PENDING, 'Adalet Bakanı']], 1, 999999999)
     assert result['absent_count'] == 999999998
-    assert result['absent_ranges'] == ['1–4', '6–999999999']
-    assert number_ranges([5, 2, 1, 2, 7, 8]) == ['1–2', '5', '7–8']
+    assert result['absent_ranges'] == ['1-4', '6-999999999']
+    assert number_ranges([5, 2, 1, 2, 7, 8]) == ['1-2', '5-5', '7-8']
     with pytest.raises(TableError):
         run([[5, PENDING, 'Adalet Bakanı']], 6, 5)
 

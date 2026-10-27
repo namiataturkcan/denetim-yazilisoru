@@ -89,7 +89,7 @@ def render_home():
         st.markdown('<div class="module-card"><div class="module-number">01 · BELGE İNCELEMESİ</div><h2>Yazılı Soru Önergesi İncelemesi</h2><p>Önerge PDF’sini yükleyin. Şekil kontrollerini, bakan ve seçim çevresi eşleşmelerini inceleyin; hataları belge üzerinde görün.</p></div>', unsafe_allow_html=True)
         st.button("Önerge incelemesine geç", type="primary", width="stretch", on_click=select_module, args=("review",))
     with right:
-        st.markdown('<div class="module-card"><div class="module-number">02 · LİSTE İŞLEMLERİ</div><h2>Gelen Kağıt İşlemleri</h2><p>Excel yükleyin veya tablo yapıştırın. Esas numarası aralığına göre cevaplanmamış önergeleri, bulunan ve eksik muhatapları listeleyin.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="module-card"><div class="module-number">02 · LİSTE İŞLEMLERİ</div><h2>Gelen Kağıt İşlemleri</h2><p>Memur işlemi veya uzman kontrolünü seçin. Excel’den ilan edilecek ya da ilan edilmiş önerge numaralarını ve bakanlıkları listeleyin.</p></div>', unsafe_allow_html=True)
         st.button("Gelen kağıt işlemlerine geç", type="primary", width="stretch", on_click=select_module, args=("incoming",))
 
 
@@ -106,16 +106,17 @@ def render_review():
         st.stop()
     data = uploaded.getvalue()
     digest = hashlib.sha256(data).hexdigest()
-    if st.session_state.get("document") != digest:
+    loaded = bool(st.session_state.get("pages")) or bool(st.session_state.get("document_error"))
+    if st.session_state.get("document") != digest or not loaded:
         for name in ("markings", "markings_error", "result", "pages", "document_error"):
             st.session_state.pop(name, None)
-        st.session_state["document"] = digest
         try:
             if len(data) > MAX_BYTES:
                 raise HTTPException(413, "Dosya sınırı 12 MB.")
             st.session_state["pages"] = prepare_pdf(data)
         except HTTPException as exc:
             st.session_state["document_error"] = exc.detail
+        st.session_state["document"] = digest
     if st.session_state.get("document_error"):
         st.error(st.session_state["document_error"])
         st.stop()
@@ -178,7 +179,7 @@ def render_review():
             for missing in markings["missing"]:
                 st.warning(f"Kontrol {missing['number']} · Sayfa {missing['page']}: {missing['reason']}. Belgeye konum işareti eklenmedi; sağdaki açıklamayı inceleyin.")
             if markings["locations"]:
-                st.download_button("İşaretli PDF’yi indir", markings["pdf"], file_name="onerge-isaretli.pdf", mime="application/pdf")
+                st.download_button("İşaretli PDF’yi indir", markings["pdf"], file_name="onerge-isaretli.pdf", mime="application/pdf", on_click="ignore")
     with right:
         if result:
             render_report(result)
@@ -241,7 +242,7 @@ def render_report(result):
                 st.code(comparison["diff"], language="diff")
     document_id = result.get("document_sha256", "belge")[:8]
     st.download_button("Raporu indir (JSON)", json.dumps(result, ensure_ascii=False, indent=2),
-                       file_name=f"onerge-raporu-{RELEASE}-{document_id}.json", mime="application/json")
+                       file_name=f"onerge-raporu-{RELEASE}-{document_id}.json", mime="application/json", on_click="ignore")
 
 
 if __name__ == "__main__":
