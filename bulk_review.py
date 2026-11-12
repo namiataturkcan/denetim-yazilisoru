@@ -52,6 +52,7 @@ COLUMNS = {
     'minister': ('Soru Muhatabı', 'Muhatap Adı', 'Muhatap Ad Soyad'),
     'term': ('Donem Adı', 'Dönem Adı', 'Dönem', 'Yasama Dönemi'),
     'combined': ('Önerge Sahibi Özeti',),
+    'owner_summary': ('Sahibi ve Özeti',),
 }
 
 
@@ -74,6 +75,10 @@ def _header(row):
             else:
                 raise TableError('Önerge Sahibi Özeti yanında Esas No sütunu bulunamadı. Genel Evrak No esas numarası değildir.')
         return found
+    if 'owner_summary' in found:
+        if 'number' not in found:
+            raise TableError('Sahibi ve Özeti yanında Esas No sütunu bulunamadı.')
+        return found
     if found:
         missing = [COLUMNS[f][0] for f in ('number', *FIELDS) if f not in found]
         if missing:
@@ -82,42 +87,64 @@ def _header(row):
 
 
 def default_kkbs_sheet(data, names):
-    """Pick a recognized data sheet, not the first lookup/print sheet."""
+    """Prefer row-level metadata; also support standalone grouped dispatch lists."""
     book = _workbook(data)
+    grouped = None
     try:
         for name in names:
             ws = book[name]
             ws.reset_dimensions()
             for raw in islice(ws.iter_rows(values_only=True), 20):
                 try:
-                    if _header(raw):
-                        return name
+                    header = _header(raw)
+                    if header:
+                        if 'owner_summary' not in header:
+                            return name
+                        grouped = grouped or name
+                        break
                 except TableError:
                     break
-        return names[0]
+        return grouped or names[0]
     finally:
         book.close()
 
 
-def packet_fields(text):
-    """Parse explicit metadata at either end; never infer it from the summary."""
+def owner_fields(text):
+    """Only the explicit owner prefix is a source of names and constituencies."""
     text = ' '.join(text.split())
     letters = r'[^\W\d_]+'
     name = rf'{letters}(?:[ -]{letters}){{1,5}}'
     owner = re.match(rf"^(?P<province>{letters}(?:[ -]{letters}){{0,2}}) Milletvekili "
                      rf"(?P<member>{name})['’‘ʼ](?:n[ıiuü]n|[ıiuü]n),", text, re.IGNORECASE)
+    return dict(member=owner['member'] if owner else '', province=owner['province'] if owner else '')
+
+
+def packet_fields(text):
+    """Parse explicit metadata at either end; never infer it from the summary."""
+    text = ' '.join(text.split())
     recipient = re.search(r"\b(?:ilişkin|dair|hakkında) (?P<title>[^()'’‘ʼ]{1,100}? Bakanı|Cumhurbaşkanı Yardımcısı)"
                           r"['’‘ʼ]ndan(?: \((?P<minister>[^()]+)\))? yazılı soru önergesi"
                           r"(?: \(Başkanlığa geliş tarihi: [^()]+\))?\s*$", text, re.IGNORECASE)
-    return dict(member=owner['member'] if owner else '', province=owner['province'] if owner else '',
-                title=recipient['title'].strip() if recipient else '',
+    return dict(**owner_fields(text), title=recipient['title'].strip() if recipient else '',
                 minister=(recipient['minister'] or '').strip() if recipient else '',
                 minister_in_source=recipient is None or recipient['minister'] is not None)
+
+
+def group_recipient(text):
+    """A section heading is explicit source data, not a name from the minister list."""
+    text = ' '.join(text.split())
+    match = re.fullmatch(r'(?P<title>[^\W\d_][^()\d]{0,100}? Bakan(?:lığı|ı)|Cumhurbaşkanı Yardımcısı)'
+                         r'(?: \((?P<minister>[^()]+)\))?', text, re.IGNORECASE)
+    if match is None:
+        return None
+    return dict(title=match['title'], minister=(match['minister'] or '').strip(),
+                minister_in_source=match['minister'] is not None)
 
 
 def read_kkbs(data, sheet):
     book = _workbook(data)
     records, invalid, mapping = [], [], None
+    recipient = None
     try:
         if sheet not in book.sheetnames:
             raise TableError('Seçilen çalışma sayfası bulunamadı.')
@@ -134,18 +161,34 @@ def read_kkbs(data, sheet):
             if len(row) > MAX_COLUMNS:
                 raise TableError('Excel en fazla 128 sütun içerebilir.')
             cells = [key(v) for v in row]
-            is_header = any(v in {key(a) for f in ('number', 'combined') for a in COLUMNS[f]} for v in cells)
+            is_header = any(v in {key(a) for f in ('number', 'combined', 'owner_summary') for a in COLUMNS[f]} for v in cells)
             if mapping is None or is_header:
                 found = _header(row)
                 if found:
                     mapping = found
                     continue
+                nonempty = [str(v).strip() for v in row if v is not None and str(v).strip()]
+                if len(nonempty) == 1:
+                    recipient = group_recipient(nonempty[0])
                 if row_no <= 20:
                     continue
                 raise TableError('KKBS başlıkları bulunamadı; başlıklı .xlsx raporu yükleyin.')
             def cell(field):
                 index = mapping.get(field)
                 return str(row[index] or '').strip() if index is not None and index < len(row) else ''
+            if 'owner_summary' in mapping:
+                # Ignore auxiliary columns outside the dispatch table. A section
+                # heading occupies one cell and has neither a serial nor an ID.
+                leading = row[:max(mapping['number'], mapping['owner_summary']) + 1]
+                nonempty = [str(v).strip() for v in leading if v is not None and str(v).strip()]
+                if not nonempty:
+                    continue
+                if not cell('number') and len(nonempty) == 1:
+                    recipient = group_recipient(nonempty[0])
+                    if recipient is None:
+                        raise TableError(f'Excel satır {row_no}: bakanlık bölüm başlığı tanınamadı. '
+                                         'Sonraki kayıtlar önceki bakanlığa aktarılmadı; başlığı kontrol edin.')
+                    continue
             try:
                 if mapping.get('unlabeled_number') and not re.fullmatch(r'7\s*/\s*[0-9]{1,9}', cell('number')):
                     raise ValueError('Başlıksız esas numarası sütununda 7/numara bekleniyor.')
@@ -156,6 +199,11 @@ def read_kkbs(data, sheet):
             if 'combined' in mapping:
                 values = packet_fields(cell('combined'))
                 records.append(KKBSRecord(number, term=term_name(cell('term')), source_row=row_no, **values))
+            elif 'owner_summary' in mapping:
+                if recipient is None:
+                    raise TableError(f'Excel satır {row_no}: önergeden önce bakanlık bölüm başlığı bulunamadı.')
+                records.append(KKBSRecord(number, term=term_name(cell('term')), source_row=row_no,
+                                          **owner_fields(cell('owner_summary')), **recipient))
             else:
                 records.append(KKBSRecord(number, *(cell(f) for f in FIELDS), term_name(cell('term')), row_no))
         if not records:

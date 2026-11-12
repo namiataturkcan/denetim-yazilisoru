@@ -90,3 +90,17 @@ def test_packet_automatically_selects_veri_and_discloses_unavailable_minister_na
     assert any('1 kayıtta Excel yalnızca muhatap' in i.value for i in at.info)
     assert any('7/50000' in c.value for c in at.caption)
     assert any(b.label == 'Toplu incelemeyi başlat' and not b.disabled for b in at.button)
+
+
+def test_dispatch_list_upload_needs_no_evrak_number_and_is_ready_to_review(monkeypatch):
+    from test_bulk_dispatch import dispatch_rows
+    def upload(label, **kwargs):
+        return Upload(pdf(4), 'scan.pdf') if 'taraması' in label else Upload(workbook(dispatch_rows()), 'liste.xlsx')
+    at = login(configured(monkeypatch))
+    with patch('streamlit.file_uploader', side_effect=upload):
+        at.radio(key='review_mode').set_value('Toplu inceleme').run()
+    assert not at.exception and not at.error
+    assert any('4 PDF sayfası · 4 KKBS satırı' in c.value for c in at.caption)
+    assert any('evrak numarası gerekmez' in c.value for c in at.caption)
+    assert any('3 kayıtta Excel yalnızca muhatap' in i.value for i in at.info)
+    assert any(b.label == 'Toplu incelemeyi başlat' and not b.disabled for b in at.button)

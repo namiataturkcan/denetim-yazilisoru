@@ -33,6 +33,8 @@ def render_bulk(credential, model, authorize):
                            max_upload_size=MAX_BULK_MB, disabled=busy)
     excel = st.file_uploader('Karşılaştırılacak KKBS raporu (.xlsx)', type=['xlsx'], key='bulk_excel',
                              max_upload_size=12, disabled=busy)
+    st.caption('Esas numarasıyla eşleştirme yapılır; evrak numarası gerekmez. Bakanlık başlıkları altında '
+               '“Esas No / Sahibi ve Özeti” bulunan listeler de desteklenir.')
     if not credential:
         st.error('Analiz bağlantısı henüz yapılandırılmadı.')
     if pdf is None or excel is None:
