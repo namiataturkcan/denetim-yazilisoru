@@ -16,6 +16,7 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError
 
 from app import ANALYSIS_VERSION, RELEASE, MAX_BYTES, RULES, analyze, finalize, prepare_pdf
 from incoming_ui import render_incoming
+from bulk_ui import pause_bulk_job, render_bulk
 
 
 def setting(name, default=""):
@@ -54,6 +55,7 @@ def main():
     # Store a fingerprint, never the submitted password, and invalidate on rotation.
     fingerprint = hashlib.sha256(password.encode()).hexdigest()
     if st.session_state.get("authenticated") != fingerprint:
+        pause_bulk_job()
         with st.form("login"):
             entered = st.text_input("Erişim parolası", type="password")
             submitted = st.form_submit_button("Giriş yap")
@@ -65,12 +67,14 @@ def main():
                 st.error("Parola doğru değil.")
         st.stop()
     if st.button("Çıkış yap", type="tertiary"):
+        pause_bulk_job()
         st.session_state.clear()
         st.rerun()
     if section not in titles:
         render_home()
         return
     if st.button("← İşlem seçimine dön", type="tertiary"):
+        pause_bulk_job()
         st.session_state.pop("active_module", None)
         st.rerun()
     if section == "incoming":
@@ -95,6 +99,14 @@ def render_home():
 
 def render_review():
     key = setting("ONERGE_DIRECT_API_KEY") or setting("ONERGE_API_KEY") or setting("OPENAI_API_KEY")
+    job = st.session_state.get('bulk_job')
+    mode = st.radio('İnceleme türü', ['Tekli inceleme', 'Toplu inceleme'], horizontal=True,
+                    key='review_mode', disabled=job is not None and job.running)
+    if mode == 'Toplu inceleme':
+        render_bulk(key, setting('ONERGE_MODEL', 'gpt-4.1'),
+                    lambda: bool(setting('APP_PASSWORD')) and st.session_state.get('authenticated')
+                    == hashlib.sha256(setting('APP_PASSWORD').encode()).hexdigest())
+        return
     if not key:
         st.error("Analiz bağlantısı henüz yapılandırılmadı.")
     st.caption("En fazla 12 MB, 10 sayfa PDF. Analiz sırasında sayfa görüntüleri OpenAI'a gönderilir. Sonuçları belgeyle karşılaştırarak kontrol edin.")
