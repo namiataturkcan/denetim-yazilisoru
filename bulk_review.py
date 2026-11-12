@@ -6,6 +6,7 @@ import io
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from itertools import islice
 from pathlib import Path
 from typing import Literal
 
@@ -38,6 +39,9 @@ class KKBSRecord:
     minister: str
     term: str
     source_row: int
+    # Packet exports address ministries, without storing each minister's name.
+    # This differs from an unexpectedly empty cell in a named minister column.
+    minister_in_source: bool = True
 
 
 COLUMNS = {
@@ -47,7 +51,68 @@ COLUMNS = {
     'title': ('Muhatap Unvanı', 'Muhatap Ünvanı', 'Muhatap Unvan', 'Muhatap Ünvan'),
     'minister': ('Soru Muhatabı', 'Muhatap Adı', 'Muhatap Ad Soyad'),
     'term': ('Donem Adı', 'Dönem Adı', 'Dönem', 'Yasama Dönemi'),
+    'combined': ('Önerge Sahibi Özeti',),
 }
+
+
+def _header(row):
+    cells = [key(v) for v in row]
+    found = {}
+    for field, aliases in COLUMNS.items():
+        indices = [i for i, v in enumerate(cells) if v in {key(a) for a in aliases}]
+        if len(indices) > 1:
+            raise TableError(f'Birden fazla {aliases[0]} sütunu var.')
+        if indices:
+            found[field] = indices[0]
+    if 'combined' in found:
+        if 'number' not in found:
+            # The user's packet template has a deliberately unlabeled B column.
+            # Recognize this exact layout, never infer IDs from row order or evrak no.
+            if cells[:4] == [key('Paket Adı'), '', key('Genel Evrak No'), key('Önerge Sahibi Özeti')]:
+                found['number'] = 1
+                found['unlabeled_number'] = True
+            else:
+                raise TableError('Önerge Sahibi Özeti yanında Esas No sütunu bulunamadı. Genel Evrak No esas numarası değildir.')
+        return found
+    if found:
+        missing = [COLUMNS[f][0] for f in ('number', *FIELDS) if f not in found]
+        if missing:
+            raise TableError('Toplu karşılaştırma için eksik sütunlar: ' + ', '.join(missing))
+    return found or None
+
+
+def default_kkbs_sheet(data, names):
+    """Pick a recognized data sheet, not the first lookup/print sheet."""
+    book = _workbook(data)
+    try:
+        for name in names:
+            ws = book[name]
+            ws.reset_dimensions()
+            for raw in islice(ws.iter_rows(values_only=True), 20):
+                try:
+                    if _header(raw):
+                        return name
+                except TableError:
+                    break
+        return names[0]
+    finally:
+        book.close()
+
+
+def packet_fields(text):
+    """Parse explicit metadata at either end; never infer it from the summary."""
+    text = ' '.join(text.split())
+    letters = r'[^\W\d_]+'
+    name = rf'{letters}(?:[ -]{letters}){{1,5}}'
+    owner = re.match(rf"^(?P<province>{letters}(?:[ -]{letters}){{0,2}}) Milletvekili "
+                     rf"(?P<member>{name})['’‘ʼ](?:n[ıiuü]n|[ıiuü]n),", text, re.IGNORECASE)
+    recipient = re.search(r"\b(?:ilişkin|dair|hakkında) (?P<title>[^()'’‘ʼ]{1,100}? Bakanı|Cumhurbaşkanı Yardımcısı)"
+                          r"['’‘ʼ]ndan(?: \((?P<minister>[^()]+)\))? yazılı soru önergesi"
+                          r"(?: \(Başkanlığa geliş tarihi: [^()]+\))?\s*$", text, re.IGNORECASE)
+    return dict(member=owner['member'] if owner else '', province=owner['province'] if owner else '',
+                title=recipient['title'].strip() if recipient else '',
+                minister=(recipient['minister'] or '').strip() if recipient else '',
+                minister_in_source=recipient is None or recipient['minister'] is not None)
 
 
 def read_kkbs(data, sheet):
@@ -69,19 +134,10 @@ def read_kkbs(data, sheet):
             if len(row) > MAX_COLUMNS:
                 raise TableError('Excel en fazla 128 sütun içerebilir.')
             cells = [key(v) for v in row]
-            is_header = any(v in {key(a) for a in COLUMNS['number']} for v in cells)
+            is_header = any(v in {key(a) for f in ('number', 'combined') for a in COLUMNS[f]} for v in cells)
             if mapping is None or is_header:
-                found = {}
-                for field, aliases in COLUMNS.items():
-                    indices = [i for i, v in enumerate(cells) if v in {key(a) for a in aliases}]
-                    if len(indices) > 1:
-                        raise TableError(f'Birden fazla {aliases[0]} sütunu var.')
-                    if indices:
-                        found[field] = indices[0]
+                found = _header(row)
                 if found:
-                    missing = [COLUMNS[f][0] for f in ('number', *FIELDS) if f not in found]
-                    if missing:
-                        raise TableError('Toplu karşılaştırma için eksik sütunlar: ' + ', '.join(missing))
                     mapping = found
                     continue
                 if row_no <= 20:
@@ -91,11 +147,17 @@ def read_kkbs(data, sheet):
                 index = mapping.get(field)
                 return str(row[index] or '').strip() if index is not None and index < len(row) else ''
             try:
+                if mapping.get('unlabeled_number') and not re.fullmatch(r'7\s*/\s*[0-9]{1,9}', cell('number')):
+                    raise ValueError('Başlıksız esas numarası sütununda 7/numara bekleniyor.')
                 number = parse_number(row[mapping['number']])
             except (ValueError, IndexError):
                 invalid.append(row_no)
                 continue
-            records.append(KKBSRecord(number, *(cell(f) for f in FIELDS), term_name(cell('term')), row_no))
+            if 'combined' in mapping:
+                values = packet_fields(cell('combined'))
+                records.append(KKBSRecord(number, term=term_name(cell('term')), source_row=row_no, **values))
+            else:
+                records.append(KKBSRecord(number, *(cell(f) for f in FIELDS), term_name(cell('term')), row_no))
         if not records:
             raise TableError('Excel’de karşılaştırılabilecek önerge kaydı bulunamadı.')
         return records, invalid
@@ -124,9 +186,16 @@ def select_records(records, first=None, last=None):
     # Identical duplicate export rows are harmless. Conflicts remain visible.
     unique = {}
     for record in records:
-        signature = (record.number, record.member, record.province, record.title, record.minister, record.term)
+        signature = (record.number, record.member, record.province, record.title, record.minister, record.term, record.minister_in_source)
         unique.setdefault(signature, record)
     return list(unique.values())
+
+
+def coverage_notes(records):
+    count = sum(not r.minister_in_source for r in records)
+    return ([f'{count} kayıtta Excel yalnızca muhatap makamını içeriyor; bakanın kişi adı yok. '
+             'Bu kayıtlarda KKBS ile kişi adı karşılaştırılmaz. Belgedeki bakan adı, '
+             'şekil incelemesinde kullanıcının kesinleştirdiği bakan listesiyle kontrol edilir.'] if count else [])
 
 
 @serialized_pdf_work
@@ -310,6 +379,10 @@ def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(
             observed['province'] = ObservedField(value=signer.constituency, page=signer.page, quote=signer.evidence, uncertain=signer.constituency_uncertain)
         observed['title'], observed['minister'] = review.recipient_title, review.recipient_name
         for field, label in FIELDS.items():
+            if field == 'minister' and not record.minister_in_source:
+                # No KKBS personal name to compare; the independent formal check
+                # above still validates the PDF against the user's minister list.
+                continue
             expected = getattr(record, field)
             actual = observed.get(field)
             actual_pages = [physical_pages[actual.page - 1]] if actual and 1 <= actual.page <= len(pages) else physical_pages

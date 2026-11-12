@@ -76,3 +76,17 @@ def test_logout_pauses_only_that_users_bulk_work(monkeypatch):
     click(at,'Çıkış yap')
     assert job._stop.is_set() and not other._stop.is_set()
     assert 'bulk_job' not in at.session_state
+
+
+def test_packet_automatically_selects_veri_and_discloses_unavailable_minister_names(monkeypatch):
+    from test_bulk_packet import packet
+    def upload(label, **kwargs):
+        return Upload(pdf(3), 'scan.pdf') if 'taraması' in label else Upload(packet(), 'packet.xlsx')
+    at = login(configured(monkeypatch))
+    with patch('streamlit.file_uploader', side_effect=upload):
+        at.radio(key='review_mode').set_value('Toplu inceleme').run()
+    assert not at.exception and not at.error
+    assert at.selectbox(key='bulk_sheet').value == 'Veri'
+    assert any('1 kayıtta Excel yalnızca muhatap' in i.value for i in at.info)
+    assert any('7/50000' in c.value for c in at.caption)
+    assert any(b.label == 'Toplu incelemeyi başlat' and not b.disabled for b in at.button)

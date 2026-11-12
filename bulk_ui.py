@@ -7,7 +7,8 @@ import streamlit as st
 
 from bulk_jobs import BulkJob
 from bulk_review import (BULK_VERSION, MAX_BULK_MB, MAX_BULK_PAGES, TableError,
-                         inspect_pdf, issue_rows, issues_csv, read_kkbs, select_records)
+                         coverage_notes, default_kkbs_sheet, inspect_pdf, issue_rows,
+                         issues_csv, read_kkbs, select_records)
 from incoming_papers import sheet_names
 
 
@@ -49,7 +50,7 @@ def render_bulk(credential, model, authorize):
         if st.session_state.get('bulk_excel_hash') != excel_hash:
             names = sheet_names(excel_data)
             st.session_state['bulk_sheets'] = names
-            st.session_state.pop('bulk_sheet', None)
+            st.session_state['bulk_sheet'] = default_kkbs_sheet(excel_data, names)
             st.session_state['bulk_excel_hash'] = excel_hash
         sheet = st.selectbox('KKBS çalışma sayfası', st.session_state['bulk_sheets'], key='bulk_sheet', disabled=busy)
         table_key = (excel_hash, sheet, BULK_VERSION)
@@ -70,6 +71,9 @@ def render_bulk(credential, model, authorize):
         last = right.number_input('Grubun bitiş esas numarası', value=None, min_value=1, max_value=999999999,
                                    step=1, key='bulk_last', disabled=busy)
         selected = select_records(records, first, last)
+        st.caption(f'KKBS esas numaraları: 7/{min(r.number for r in selected)} – 7/{max(r.number for r in selected)}')
+        for note in coverage_notes(selected):
+            st.info(note)
         invalid = st.session_state['bulk_invalid']
         if invalid:
             st.error(f'{len(invalid)} KKBS satırının esas numarası okunamadı. Bu satırların hangi gruba ait olduğu '
@@ -149,6 +153,8 @@ def render_progress(job, credential, authorize):
 def render_findings(snapshot):
     findings = snapshot['issues']
     st.subheader('Toplu inceleme sonucu')
+    for note in snapshot.get('coverage_notes', []):
+        st.info(note)
     a, b, c = st.columns(3)
     a.metric('Tamamlanan inceleme', snapshot['processed'] - snapshot['failed'])
     b.metric('Hatalı bulgu', sum(f['status'] == 'uyari' for f in findings))

@@ -11,7 +11,7 @@ from typing import Literal
 import pymupdf
 from recipient_validation import validate_recipient, extract_recipients
 from constituency_validation import validate_constituency
-from reading_validation import ReadingComparison, evidence_present, tokens
+from reading_validation import ReadingComparison, damaged_ocr, evidence_present, ocr_noise, tokens
 from pdf_processing import render_scale, serialized_pdf_work
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -24,7 +24,7 @@ ROOT = Path(__file__).parent
 RULES = json.loads((ROOT / "rules.json").read_text())
 MEMBER_REFERENCE = json.loads((ROOT / "member_reference.json").read_text())
 SUMMARY_STYLE = json.loads((ROOT / "summary_style.json").read_text())
-RELEASE = "2026.11.12.1"
+RELEASE = "2026.11.12.2"
 # Changes to either the validation code or the user's sources invalidate old reports.
 _revision_files = ("app.py", "reading_validation.py", "recipient_validation.py",
                    "constituency_validation.py", "annotations.py", "pdf_processing.py",
@@ -157,9 +157,10 @@ def prepare_pdf(data: bytes):
 
 @serialized_pdf_work
 def fill_missing_ocr(pages):
-    """Read raster-only pages independently, never feed this text to the model."""
+    """Reread missing or heavily corrupted OCR independently of vision/references."""
     for page in pages:
-        if page["ocr"].strip() or page.get("ocr_attempted"):
+        original = page['ocr']
+        if (original.strip() and not damaged_ocr(original)) or page.get("ocr_attempted"):
             continue
         page["ocr_attempted"] = True
         for language in ("tur+eng", "eng"):
@@ -168,6 +169,15 @@ def fill_missing_ocr(pages):
                 ocr_pdf = pix.pdfocr_tobytes(language=language)
                 with pymupdf.open(stream=ocr_pdf, filetype="pdf") as doc:
                     text = doc[0].get_text()
+                if not text.strip():
+                    continue
+                if original.strip():
+                    # Reject an incomplete or equally noisy replacement. Choosing
+                    # OCR must never depend on what the model/reference says.
+                    if (ocr_noise(text) >= ocr_noise(original) / 2
+                            or sum(c.isalpha() for c in text) < sum(c.isalpha() for c in original) * .6):
+                        continue
+                    page['ocr_original'] = original
                 page["ocr"] = text
                 page["ocr_source"] = "tesseract"
                 break
@@ -274,6 +284,7 @@ def finalize(review: Review, pages, *, member_reference=None):
         state = "belirsiz" if p.uncertainties or "[OKUNAMADI]" in p.text else (
             "ocr_yok" if not ocr.strip() else "uyumlu" if tokens(ocr) == tokens(p.text) else "uyusmazlik")
         comparisons.append({"page": p.page, "state": state, "ocr": ocr,
+            "ocr_original": pages[p.page - 1].get("ocr_original", ""),
             "vision": p.text, "uncertainties": p.uncertainties, "ocr_source": pages[p.page - 1].get("ocr_source", "pdf_text" if ocr.strip() else "none"),
             "diff": "\n".join(difflib.unified_diff(ocr.splitlines(), p.text.splitlines(), fromfile="Bağımsız OCR" if pages[p.page - 1].get("ocr_source") == "tesseract" else "PDF metin katmanı", tofile="Görsel okuma", lineterm=""))})
     review_data = review.model_dump()

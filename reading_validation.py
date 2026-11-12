@@ -22,6 +22,16 @@ def tokens(text):
     return re.findall(r'\w+', normalize(text).translate(str.maketrans('çğıöşüâû', 'cgiosuau')))
 
 
+def ocr_noise(text):
+    """Count intraword artifacts, not accents, names or differences from vision."""
+    return len(re.findall(r'(?<=[^\W\d_])[0-9~<>§;?]+(?=[^\W\d_])', text))
+
+
+def damaged_ocr(text):
+    noise = ocr_noise(text)
+    return noise >= 6 and noise >= len(re.findall(r'\w+', text)) * .05
+
+
 def span(sequence, part):
     return next(spans(sequence, part), None)
 

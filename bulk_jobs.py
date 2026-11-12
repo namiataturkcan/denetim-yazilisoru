@@ -7,7 +7,7 @@ from time import monotonic
 from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
-from bulk_review import (BULK_VERSION, INDEX_WINDOW, MAX_PROPOSALS, TableError, index_pages, issue,
+from bulk_review import (BULK_VERSION, INDEX_WINDOW, MAX_PROPOSALS, TableError, coverage_notes, index_pages, issue,
                          make_units, reconciliation, render_pages, review_unit)
 
 # Bound RAM and API load across users; each proposal also shares the single-review API gate.
@@ -156,4 +156,5 @@ class BulkJob:
                     'expected_count': len({r.number for r in self.records}),
                     'processed': len(results), 'failed': sum(r['failed'] for r in results),
                     'matched': sum(r['matched'] for r in results),
+                    'coverage_notes': coverage_notes(self.records),
                     'issues': deepcopy(reconciliation(self.records, results, self.unassigned, self.state == 'complete'))}
