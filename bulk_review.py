@@ -359,13 +359,29 @@ def issue(number, pages, status, field, explanation, expected='', actual='', inf
             'explanation': explanation, 'expected': expected, 'actual': actual, 'inferred': inferred}
 
 
-def readable(field, review, pages):
-    if field.page < 1 or field.page > len(pages) or field.uncertain or not field.value.strip():
-        return False
+def reading_problem(field, review, pages):
+    if field.page < 1 or field.page > len(pages):
+        return 'Okunan alanın sayfa numarası geçersiz.'
+    if field.uncertain:
+        return 'Görsel okuma bu alanı belirsiz olarak bildirdi.'
+    if not field.value.strip():
+        return 'Görsel okumada bu alan için değer elde edilemedi.'
     reading = next((p for p in review.pages if p.page == field.page), None)
-    return bool(reading and '[OKUNAMADI]' not in field.quote
-                and evidence_present(reading.text, field.quote) and field_present(field.quote, field.value)
-                and not serious_disagreement(reading.text, pages[field.page - 1]['ocr'], field.quote))
+    if reading is None:
+        return 'İlgili sayfanın görsel metin okuması bulunamadı.'
+    if '[OKUNAMADI]' in field.quote:
+        return 'Dayanak alıntıda okunamayan bölüm var.'
+    if not evidence_present(reading.text, field.quote):
+        return 'Dayanak alıntı, görselden aktarılan sayfa metninde aynen bulunamadı.'
+    if not field_present(field.quote, field.value):
+        return 'Okunan değer, dayanak alıntıda aynen bulunamadı.'
+    if serious_disagreement(reading.text, pages[field.page - 1]['ocr'], field.quote):
+        return 'Bu alanda görsel okuma ile bağımsız PDF/OCR metni uyuşmuyor.'
+    return ''
+
+
+def readable(field, review, pages):
+    return not reading_problem(field, review, pages)
 
 
 def comparable(value):
@@ -381,17 +397,24 @@ def title_key(value):
 def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(), hint=None):
     """Return only errors/uncertainties, with physical page numbers and exact source evidence."""
     findings, number, record = [], None, None
-    if readable(review.number, review, pages):
+    number_problem = reading_problem(review.number, review, pages)
+    if not number_problem:
         try:
             number = parse_number(review.number.value)
         except ValueError:
-            pass
+            number_problem = 'Okunan değer geçerli bir esas numarası biçiminde değil.'
     inferred = number is None and hint is not None
     display_number = hint if inferred else number
     if number is None:
         findings.append(issue(display_number, physical_pages, 'belirsiz', 'Esas numarası',
                               'Esas numarası güvenle okunamadı; KKBS eşleşmesi onaylanmadı.'
-                              + (' Gösterilen numara yalnızca paket sırasına göre adaydır.' if inferred else ''), inferred=inferred))
+                              + ' ' + number_problem
+                              + ' Milletvekili ve bakanlık bilgileri KKBS kaydıyla karşılaştırılmadı.'
+                              + (' Gösterilen numara yalnızca paket sırasına göre adaydır.' if inferred else ''),
+                              actual=review.number.value, inferred=inferred))
+        findings[-1]['reading_evidence'] = {'value': review.number.value, 'quote': review.number.quote,
+                                           'local_page': review.number.page, 'uncertain': review.number.uncertain,
+                                           'rejection_reason': number_problem}
     else:
         matches = [r for r in records if r.number == number]
         if len(matches) == 1:
@@ -439,7 +462,7 @@ def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(
                                       f'KKBS satır {record.source_row}: bu alan boş; karşılaştırma yapılamadı.'))
             elif actual is None or not readable(actual, review, pages):
                 findings.append(issue(number, actual_pages, 'belirsiz', 'KKBS · ' + label,
-                                      'Belgedeki alan tekil ve güvenilir biçimde okunamadı.', expected=expected,
+                                      reading_problem(actual, review, pages) if actual else 'Belgedeki alan tekil biçimde ayrıştırılamadı.', expected=expected,
                                       actual=actual.value if actual else ''))
             elif (title_key if field == 'title' else comparable)(expected) != (title_key if field == 'title' else comparable)(actual.value):
                 findings.append(issue(number, actual_pages, 'uyari', 'KKBS · ' + label,

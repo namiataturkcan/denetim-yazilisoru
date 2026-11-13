@@ -132,3 +132,46 @@ def test_authentication_failure_pauses_batch_and_never_marks_remaining_proposals
     assert snapshot['state'] == 'paused' and snapshot['processed'] == 0
     assert snapshot['message'] == 'API anahtarı kabul edilmedi.'
     assert 'secret' not in str(snapshot)
+
+
+def result(number, *, matched=True, issues=None):
+    return {'number': number, 'pages': [1], 'matched': matched, 'issues': issues or [], 'failed': False}
+
+
+def test_two_matched_records_out_of_102_with_106_processed_documents_is_incomplete():
+    from bulk_review import issue
+    job = jobs.BulkJob(b'pdf', 221, [record(i) for i in range(50750, 50852)], 'test', 'digest')
+    job.state = 'complete'
+    job.units = [{'pages': [i], 'boundary_warnings': []} for i in range(1, 107)]
+    results = [result(50790), result(50799)] + [result(None, matched=False) for _ in range(101)]
+    results += [result(n, matched=False) for n in (1586, 20923, 894)]
+    job.results = dict(enumerate(results))
+    snapshot = job.snapshot()
+    assert snapshot['processing_complete'] and snapshot['processed'] == 106
+    assert snapshot['matched'] == 2 and snapshot['expected_count'] == 102
+    assert snapshot['unmatched_documents'] == 104
+    assert len(snapshot['unmatched_records']) == 100 and 50832 in snapshot['unmatched_records']
+    assert not snapshot['matching_complete'] and not snapshot['complete']
+
+
+def test_duplicates_boundaries_and_unassigned_pages_cannot_inflate_coverage():
+    from bulk_review import issue
+    records = [record(), record(50001)]
+    coverage = jobs.matching_coverage(records, [result(50000), result(50000)], [])
+    assert coverage['matched'] == 0 and not coverage['matching_complete']
+    warning = issue(50000, [1], 'belirsiz', 'Sayfa eşleştirme', 'Sınır belirsiz')
+    coverage = jobs.matching_coverage(records, [result(50000, issues=[warning]), result(50001)], [])
+    assert coverage['matched'] == 1 and not coverage['matching_complete']
+    coverage = jobs.matching_coverage(records, [result(50000), result(50001)], [warning])
+    assert coverage['matched'] == 2 and not coverage['matching_complete']
+
+
+def test_a_real_member_mismatch_still_completes_comparison_and_remains_an_error():
+    from bulk_review import issue
+    job = jobs.BulkJob(b'pdf', 1, [record()], 'test', 'digest')
+    job.state = 'complete'
+    job.units = [{'pages':[1], 'boundary_warnings':[]}]
+    job.results = {0: result(50000, issues=[issue(50000, [1], 'uyari', 'KKBS · Milletvekili', 'Ad farklı')])}
+    snapshot = job.snapshot()
+    assert snapshot['complete'] and snapshot['matching_complete']
+    assert snapshot['issues'][0]['status'] == 'uyari'

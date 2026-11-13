@@ -37,7 +37,7 @@ def test_only_error_and_suspect_rows_and_partial_progress_are_rendered():
     assert at.info and 'ara rapordur' in at.info[0].value
     assert len(at.get('download_button')) == 2
     assert not any('İşaretli PDF' in d.label for d in at.get('download_button'))
-    complete={**snapshot,'state':'complete','issues':[]}
+    complete={**snapshot,'state':'complete','issues':[], 'complete':True, 'matched':1,'expected_count':1}
     at=AppTest.from_string('from bulk_ui import render_findings\nrender_findings('+repr(complete)+')').run()
     assert at.success and not at.dataframe
 
@@ -104,3 +104,21 @@ def test_dispatch_list_upload_needs_no_evrak_number_and_is_ready_to_review(monke
     assert any('evrak numarası gerekmez' in c.value for c in at.caption)
     assert any('3 kayıtta Excel yalnızca muhatap' in i.value for i in at.info)
     assert any(b.label == 'Toplu incelemeyi başlat' and not b.disabled for b in at.button)
+
+
+def test_processed_batch_with_two_of_102_matches_is_not_a_completed_review():
+    import json
+    snapshot = {'state':'complete', 'processed':106, 'failed':0, 'proposal_count':106,
+                'expected_count':102, 'matched':2, 'matching_complete':False, 'complete':False,
+                'issues':[issue(50832, [], 'belirsiz', 'PDF eşleştirme', 'KKBS kaydı PDF ile eşleşmedi.')]}
+    with patch('streamlit.delta_generator.DeltaGenerator.download_button', autospec=True, return_value=False) as download:
+        at = AppTest.from_string('from bulk_ui import render_findings\nrender_findings('+repr(snapshot)+')').run()
+    assert not at.exception and not at.success
+    assert any('2 / 102' in e.value and 'tamamlanamadı' in e.value for e in at.error)
+    assert any('106 belge başlangıcı' in w.value for w in at.warning)
+    assert any(m.label == 'KKBS ile eşleşen' and m.value == '2 / 102' for m in at.metric)
+    assert not any(m.label == 'Tamamlanan inceleme' for m in at.metric)
+    assert len(download.call_args_list) == 2
+    assert all('eksik-karsilastirma' in call.args[3] for call in download.call_args_list)
+    exported = json.loads(download.call_args_list[1].args[2])
+    assert not exported['complete'] and not exported['matching_complete']

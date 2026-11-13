@@ -157,12 +157,21 @@ def render_findings(snapshot):
     st.subheader('Toplu inceleme sonucu')
     for note in snapshot.get('coverage_notes', []):
         st.info(note)
-    a, b, c = st.columns(3)
-    a.metric('Tamamlanan inceleme', snapshot['processed'] - snapshot['failed'])
-    b.metric('Hatalı bulgu', sum(f['status'] == 'uyari' for f in findings))
-    c.metric('Şüpheli bulgu', sum(f['status'] == 'belirsiz' for f in findings))
+    a, b, c, d = st.columns(4)
+    a.metric('İşlenen belge', snapshot['processed'] - snapshot['failed'])
+    b.metric('KKBS ile eşleşen', f"{snapshot.get('matched', 0)} / {snapshot.get('expected_count', 0)}")
+    c.metric('Hatalı bulgu', sum(f['status'] == 'uyari' for f in findings))
+    d.metric('Şüpheli bulgu', sum(f['status'] == 'belirsiz' for f in findings))
+    if (snapshot.get('proposal_count') is not None and snapshot.get('expected_count') is not None
+            and snapshot['proposal_count'] != snapshot['expected_count']):
+        st.warning(f"PDF’de {snapshot['proposal_count']} belge başlangıcı, Excel’de {snapshot['expected_count']} önerge var. "
+                   'Belge sınırları veya yüklenen grubun kapsamı kontrol edilmeli.')
     if snapshot['state'] != 'complete':
         st.info('Bu ara rapordur. Bekleyen önergeler uygun kabul edilmez; tüm grup henüz incelenmedi.')
+    elif not snapshot.get('complete', False):
+        st.error(f"KKBS karşılaştırması tamamlanamadı: {snapshot.get('matched', 0)} / {snapshot.get('expected_count', 0)} kayıt eşleşti. "
+                 'Eşleşmeyen belgelerin milletvekili ve bakanlık bilgileri KKBS ile karşılaştırılamadı; '
+                 'bu rapor grubun son kontrolü olarak kullanılamaz.')
     elif findings:
         st.warning('Aşağıda yalnızca hatalı veya şüpheli bulgular var. PDF sayfaları, dosyanın başından itibaren 1’den sayılır.')
     else:
@@ -186,8 +195,8 @@ def render_findings(snapshot):
     else:
         st.caption('Şu ana kadar listelenecek hata/şüphe yok.' if snapshot['state'] != 'complete' else 'Uygun önergeler ayrı ayrı listelenmez.')
     export = {**snapshot, 'scope': list(('Şekil', 'Milletvekili', 'Seçim çevresi', 'Muhatap bakanlık', 'Muhatap bakan')),
-              'excluded': ['Tarih', 'Özet'], 'complete': snapshot['state'] == 'complete' and not snapshot['failed']}
-    suffix = 'sonuc' if export['complete'] else 'ara-rapor'
+              'excluded': ['Tarih', 'Özet'], 'complete': bool(snapshot.get('complete', False))}
+    suffix = 'sonuc' if export['complete'] else 'eksik-karsilastirma' if snapshot['state'] == 'complete' else 'ara-rapor'
     left, right = st.columns(2)
     left.download_button('Hata ve şüphe listesini indir (CSV)', issues_csv(findings),
                          f'toplu-inceleme-{suffix}.csv', 'text/csv', on_click='ignore')

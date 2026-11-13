@@ -105,6 +105,31 @@ def test_all_matching_has_no_checklist_rows_and_never_compares_summary_or_date()
     assert bulk.reconciliation([record()], [result], [], True) == []
 
 
+@pytest.mark.parametrize('failure,fragment', [
+    ('uncertain', 'belirsiz olarak'), ('quote', 'sayfa metninde'),
+    ('value', 'dayanak alıntıda'), ('ocr', 'PDF/OCR metni uyuşmuyor')])
+def test_number_rejection_preserves_actual_reading_and_specific_cause(failure, fragment):
+    review, pages = reading()
+    if failure == 'uncertain':
+        review.number.uncertain = True
+    elif failure == 'quote':
+        review.number.quote = 'Kaynak metinde olmayan alıntı'
+    elif failure == 'value':
+        review.number.value = '7/50001'
+    else:
+        pages[0]['ocr'] = pages[0]['ocr'].replace('50000', '50001')
+    result = bulk.compare_proposal(review, pages, [180, 181][:len(pages)], [record()])
+    finding = next(i for i in result['issues'] if i['field'] == 'Esas numarası')
+    assert not result['matched'] and result['number'] is None
+    assert fragment in finding['explanation']
+    assert 'karşılaştırılmadı' in finding['explanation']
+    assert finding['actual'] == review.number.value
+    assert finding['reading_evidence']['quote'] == review.number.quote
+    assert finding['reading_evidence']['value'] == review.number.value
+    assert finding['reading_evidence']['rejection_reason']
+    assert not any(i['field'] == 'KKBS · Milletvekili' for i in result['issues'])
+
+
 @pytest.mark.parametrize('field,value,label', [('member','Başka Vekil','Milletvekili'),
     ('province','İstanbul','Seçim çevresi'), ('title','Sağlık Bakanı','Muhatap bakanlık'),
     ('minister','Başka Bakan','Muhatap bakan')])

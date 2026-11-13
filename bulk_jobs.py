@@ -1,5 +1,6 @@
 """Session-owned, resumable bulk work. Background threads never call Streamlit."""
 import asyncio
+from collections import defaultdict
 from copy import deepcopy
 from threading import Event, Lock, RLock, Thread
 from time import monotonic
@@ -24,6 +25,27 @@ def failure_message(exc):
     if isinstance(exc, (TableError, HTTPException)):
         return str(exc.detail) if isinstance(exc, HTTPException) else str(exc)
     return 'Bu bölümün analizi tamamlanamadı. Tamamlanan sonuçlar korundu; yeniden deneyebilirsiniz.'
+
+
+def matching_coverage(records, results, unassigned):
+    """A complete comparison needs one unambiguous document per KKBS record."""
+    expected = {r.number for r in records}
+    grouped = defaultdict(list)
+    for result in results:
+        grouped[result['number']].append(result)
+    verified = set()
+    for number, documents in grouped.items():
+        if number not in expected or len(documents) != 1:
+            continue
+        result = documents[0]
+        if (result['matched'] and not result['failed']
+                and not any(i['field'] in ('Sayfa eşleştirme', 'Esas numarası') for i in result['issues'])):
+            verified.add(number)
+    unmatched = len(results) - len(verified)
+    return {'matched': len(verified), 'expected_count': len(expected),
+            'unmatched_documents': unmatched,
+            'unmatched_records': sorted(expected - verified),
+            'matching_complete': bool(expected) and verified == expected and not unmatched and not unassigned}
 
 
 class BulkJob:
@@ -149,12 +171,14 @@ class BulkJob:
             if touch:
                 self.last_seen = monotonic()
             results = list(self.results.values())
+            coverage = matching_coverage(self.records, results, self.unassigned)
+            processing_complete = self.state == 'complete' and not any(r['failed'] for r in results)
             return {'version': self.version, 'source_id': self.source_id, 'state': self.state,
                     'phase': self.phase, 'message': self.message,
                     'page_count': self.page_count, 'indexed_pages': len(self.index),
                     'proposal_count': len(self.units) if self.units is not None else None,
-                    'expected_count': len({r.number for r in self.records}),
                     'processed': len(results), 'failed': sum(r['failed'] for r in results),
-                    'matched': sum(r['matched'] for r in results),
+                    **coverage, 'processing_complete': processing_complete,
+                    'complete': processing_complete and coverage['matching_complete'],
                     'coverage_notes': coverage_notes(self.records),
                     'issues': deepcopy(reconciliation(self.records, results, self.unassigned, self.state == 'complete'))}
