@@ -81,7 +81,8 @@ def test_index_reads_context_without_reclassifying_it_or_sending_ocr(monkeypatch
 @pytest.mark.parametrize('stamp,should_warn', [('50000', False), ('50001', True), ('', False)])
 def test_missed_start_with_different_stamp_cannot_be_approved_as_one_proposal(monkeypatch, stamp, should_warn):
     raw, pages = reading('50000')
-    raw.pages.append(app.PageReading(page=2, text='Soruların devamı', uncertainties=[]))
+    raw.pages.append(app.PageReading(page=2, text=stamp + '\nSoruların devamı', uncertainties=[]))
+    raw.continuation_numbers = [bulk.ObservedField(value=stamp, page=2, quote=stamp, uncertain=False)]
     pages[0]['stamp_ocr'] = [{'value': '50000'}]
     pages.append({'ocr': 'Soruların devamı', 'image': 'unused',
                   'stamp_ocr': [{'value': stamp}] if stamp else []})

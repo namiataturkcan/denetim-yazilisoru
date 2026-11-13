@@ -265,6 +265,35 @@ def inspect_pdf(data):
         raise TableError('Toplu PDF okunamadı.') from exc
 
 
+def positioned_number_candidates(words, width, height):
+    """Preserve isolated digit groups split by OCR, without guessing any digit."""
+    in_corner = lambda w: w[0] > width * .6 and w[1] < height * .2
+    complete = lambda value: re.fullmatch(r'(?:7/)?[1-9][0-9]{4,8}', value)
+    candidates = [{'value': w[4], 'rect': list(w[:4])}
+                  for w in words if in_corner(w) and complete(w[4])]
+    lines = defaultdict(list)
+    for word in words:
+        lines[word[5:7]].append(word)
+    for line in lines.values():
+        line.sort(key=lambda w: w[0])
+        if (len(line) < 2 or not all(in_corner(w) and re.fullmatch(r'[0-9/]+', w[4]) for w in line)
+                or any(complete(w[4]) for w in line)):
+            continue
+        # Separate full numbers (including adjacent four-digit years) must not
+        # be joined. Short, close fragments such as "52 3 42" can be one stamp.
+        if all(len(w[4]) >= 4 for w in line):
+            continue
+        if any(b[0] - a[2] > max(a[3]-a[1], b[3]-b[1]) * .75
+               or abs(a[1]-b[1]) > max(a[3]-a[1], b[3]-b[1]) * .3
+               for a, b in zip(line, line[1:])):
+            continue
+        if complete(''.join(w[4] for w in line)):
+            candidates.append({'value': ' '.join(w[4] for w in line),
+                               'rect': [min(w[0] for w in line), min(w[1] for w in line),
+                                        max(w[2] for w in line), max(w[3] for w in line)]})
+    return candidates
+
+
 @serialized_pdf_work
 def render_pages(data, numbers, *, stamp_details=False):
     """Render only the current window/proposal; never retain the full scan as images."""
@@ -281,10 +310,7 @@ def render_pages(data, numbers, *, stamp_details=False):
             # The numbered packet templates stamp the ID in the upper-right
             # margin. Keep this positioned, original evidence separate from the
             # body OCR refresh, which can improve words but corrupt a digit.
-            stamp_words = [w for w in page.get_text('words')
-                           if w[0] > page.rect.width * .6 and w[1] < page.rect.height * .2
-                           and re.fullmatch(r'(?:7/)?[1-9][0-9]{4,8}', w[4])]
-            stamp_ocr = [{'value': w[4], 'rect': list(w[:4])} for w in stamp_words]
+            stamp_ocr = positioned_number_candidates(page.get_text('words'), page.rect.width, page.rect.height)
             pages.append({'image': base64.b64encode(pix.tobytes('png')).decode(), 'ocr': text,
                           'ocr_source': 'pdf_text' if text.strip() else 'none',
                           'stamp_ocr': stamp_ocr})
@@ -315,6 +341,7 @@ class ObservedField(BaseModel):
 
 class BulkReading(service.Review):
     number: ObservedField
+    continuation_numbers: list[ObservedField] = Field(default_factory=list)
     recipient_title: ObservedField
     recipient_name: ObservedField
 
@@ -341,6 +368,9 @@ Bir önerge 1, 3, 6 veya başka sayıda sayfa olabilir. Sabit uzunluk veya dört
 start: yeni önergeyi açan TBMM hitabı + bakana yöneltilen yazılı cevap talebi/giriş + vekil adı/imza bloğu birlikte yeniden görülür.
 BAŞKANLIĞINA ve BAŞKANLIĞI’NA aynı geçerli hitaptır. Vekil bloğu sayfanın üstünde veya altında olabilir.
 Başlangıçta ayrı esas numarası kaşesini ara; okunaklı numaraların sırasını ek kontrol olarak kullan.
+Esas numarası sağ üsttedir: ilk sayfada numaratör baskısı, devam sayfalarında aynı numara el yazısıyla bulunabilir.
+Numaratör ile el yazısı arasındaki görünüm farkı yeni önerge veya farklı esas numarası anlamına gelmez.
+Yeni bir numaratör baskısı, yeni hitap-giriş-vekil bloğuyla birlikte sonraki önergeyi destekler.
 Silik/yok numarayı sıraya göre üretme; numaranın okunamaması, açık hitap-giriş bloğunu başlangıç saymaya engel değildir.
 Hitap eksik olsa bile diğer açılış kanıtları açıkça yeni önerge gösteriyorsa start olabilir; eksikliği açıklamaya yaz.
 continuation: önceki önergenin devamı veya açıkça ona ait ek. Başlangıç sayfasındaki konu/giriş sonraki sayfalarda sürebilir.
@@ -417,7 +447,7 @@ def number_in_quote(value, quote):
         return False
 
 
-def reading_problem(field, review, pages, *, number_field=False):
+def reading_problem(field, review, pages, *, number_field=False, handwriting=False):
     if field.page < 1 or field.page > len(pages):
         return 'Okunan alanın sayfa numarası geçersiz.'
     if field.uncertain:
@@ -446,6 +476,11 @@ def reading_problem(field, review, pages, *, number_field=False):
         if observed not in candidates:
             return 'Görselde okunan esas numarası, kaşe bölgesinin özgün PDF metniyle uyuşmuyor.'
         return ''
+    if handwriting:
+        # With no positioned numeric reading, the body OCR's omission or "w"
+        # is not a different number. Numeric contradictions above still block.
+        # A continuation mark supports the printed anchor; it never assigns an ID.
+        return ''
     if serious_disagreement(reading.text, pages[field.page - 1]['ocr'], field.quote):
         return 'Bu alanda görsel okuma ile bağımsız PDF/OCR metni uyuşmuyor.'
     return ''
@@ -469,6 +504,8 @@ def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(
     """Return only errors/uncertainties, with physical page numbers and exact source evidence."""
     findings, number, record = [], None, None
     number_problem = reading_problem(review.number, review, pages, number_field=True)
+    if review.number.page != 1:
+        number_problem = 'Esas numarası ilk sayfadaki numaratör baskısından doğrulanmadı; devam sayfasındaki el yazısı ana numaranın yerine kullanılamaz.'
     if not number_problem:
         try:
             number = stamp_number(review.number.value)
@@ -500,6 +537,7 @@ def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(
                                   'Bu esas numarası için KKBS’de çelişkili birden fazla kayıt var.'))
     for warning in boundary_warnings:
         findings.append(issue(display_number, physical_pages, 'belirsiz', 'Sayfa eşleştirme', warning, inferred=inferred))
+    findings.extend(continuation_number_findings(review, pages, physical_pages, number, display_number, inferred))
     reference = {'source': {'type': 'uploaded_kkbs'}, 'members': {}, 'invalid_constituency_labels': ['Dersim']}
     # A wrong KKBS owner must not make a clearly read, source-backed province
     # look unreadable. Formal constituency validation uses the consistent pairs
@@ -556,12 +594,49 @@ def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(
     return {'number': number, 'pages': list(physical_pages), 'issues': findings, 'matched': record is not None, 'failed': False}
 
 
+def continuation_number_findings(review, pages, physical, number, display_number, inferred):
+    marks = review.continuation_numbers
+    if len(marks) != len(pages)-1 or {m.page for m in marks} != set(range(2, len(pages)+1)):
+        return [issue(display_number, physical, 'belirsiz', 'Sayfa eşleştirme',
+                      'Devam sayfalarının esas numarası kontrolü eksik veya geçersiz; sayfa aidiyeti doğrulanamadı.', inferred=inferred)]
+    findings = []
+    for mark in marks:
+        # No mark is not itself a new proposal. An unreadable visible mark must
+        # remain uncertain, while a readable equal mark produces no finding.
+        if not mark.value.strip() and not mark.quote.strip() and not mark.uncertain and not pages[mark.page-1].get('stamp_ocr'):
+            continue
+        problem = reading_problem(mark, review, pages, number_field=True, handwriting=True)
+        actual = None
+        if not problem:
+            try:
+                actual = stamp_number(mark.value)
+            except ValueError:
+                problem = 'El yazısıyla yazılan esas numarasının rakamları doğrulanamadı.'
+        if not problem and number is not None and actual != number:
+            problem = 'Devam sayfasının sağ üstündeki numara ilk sayfadaki numaratör baskısıyla farklı okunuyor; sayfanın bu önergeye ait olduğu kontrol edilmeli.'
+        if problem:
+            finding = issue(display_number, [physical[mark.page-1]], 'belirsiz', 'Sayfa eşleştirme', problem,
+                            expected=str(number) if number is not None else '', actual=mark.value, inferred=inferred)
+            finding['reading_evidence'] = {'value': mark.value, 'quote': mark.quote, 'local_page': mark.page,
+                                           'uncertain': mark.uncertain, 'source': 'continuation_handwriting',
+                                           'stamp_ocr': pages[mark.page-1].get('stamp_ocr', [])}
+            findings.append(finding)
+    return findings
+
+
 BULK_INSTRUCTIONS = '''Bu bir toplu son kontroldür. Tarih ve özet KKBS ile karşılaştırılmayacak; summary boş olabilir.
-Bu tek önergenin üzerindeki esas numarasını number alanına çıkar: value (belgede 50000 yazıyorsa 50000, 7/50000 yazıyorsa 7/50000), page (buradaki yerel sayfa),
+Bu önergenin İLK SAYFASININ SAĞ ÜSTÜNDEKİ numaratör baskısını number alanına çıkar: value (belgede 50000 yazıyorsa 50000, 7/50000 yazıyorsa 7/50000), page (buradaki yerel sayfa: 1),
 quote (okunan metinden birebir kaşe/numara alıntısı), uncertain. Esas numarasını genel evrak, tarih, soru veya kanun numarasıyla karıştırma.
 Kaşeyi metne de aynen aktar. Yakın plan görüntüsü aynı fiziksel sayfanın sağ üst köşesidir; ayrı sayfa sayma.
 Yakın plandaki esas kaşesini de incele; sol üstteki parti Sayı numarasını esas numarası sayma.
 Silik/şüpheli rakamları tahminle tamamlama. Numara yoksa value ve quote boş, uncertain true olsun.
+Devam sayfalarının sağ üstünde aynı esas numarası el yazısıyla bulunur. continuation_numbers listesine
+2'den son sayfaya kadar HER sayfa için bir ObservedField çıkar; tek sayfalık önergede liste boş olsun.
+Her numarayı o sayfanın görüntüsünden bağımsız oku; ilk sayfadaki numarayı devam sayfasına kopyalama.
+El yazısı görünümünü numaratörle karıştırma; 52 3 42 gibi rakam aralıkları biçim farkıdır.
+Görünen rakamları ilgili sayfanın metnine ve quote alanına aynen aktar. El yazısı okunamıyorsa uncertain true olsun.
+İşaret hiç yoksa value ve quote boş, uncertain false olsun. El yazısını ilk sayfadaki belirsiz kaşenin yerine koyma.
+Devam numarası farklıysa ilk sayfanın numarasını değiştirme; farklı değeri aynen aktar, sayfa aidiyeti kodda kontrol edilecek.
 Cevap istenen muhatabın unvanını recipient_title ve adını recipient_name alanlarına aynı yapıyla çıkar.
 Konuda adı geçen kişileri muhatap sayma. Bakan adını kendi bilgine göre düzeltme. Birden fazla muhatap varsa alanı uncertain yap.
 Milletvekili adları ve seçim çevreleri signatories içinde birebir yer almalı. Bu aşamada KKBS değerleri sana verilmez.'''
@@ -574,19 +649,9 @@ async def review_unit(data, unit, records, *, credential, model, hint=None):
                 'issues': [issue(hint, physical, 'belirsiz', 'Sayfa eşleştirme',
                                   'Bir önerge için 10 sayfa sınırı aşıldı; taramadaki önerge sınırlarını kontrol edin.', inferred=hint is not None)]}
     pages = render_pages(data, physical, stamp_details=True)
-    boundary_warnings = list(unit['boundary_warnings'])
-    stamped_pages = [(number, {stamp_number(s['value']) for s in page.get('stamp_ocr', [])})
-                     for number, page in zip(physical, pages)]
-    distinct = {next(iter(values)) for _, values in stamped_pages if len(values) == 1}
-    if len(distinct) > 1:
-        detail = '; '.join(f'{number}: ' + ', '.join(map(str, sorted(values)))
-                           for number, values in stamped_pages if values)
-        boundary_warnings.append('Aynı önergeye bağlanan sayfalarda farklı esas kaşeleri okunuyor '
-                                 f'(PDF sayfası: numara — {detail}). Yeni bir önerge başlangıcı atlanmış '
-                                 'veya kaşe OCR’si hatalı olabilir; belge sınırı doğrulanamadı.')
     review = await service.analyze(pages, credential=credential, model=model,
                                    response_format=BulkReading, extra_instructions=BULK_INSTRUCTIONS)
-    return compare_proposal(review, pages, physical, records, boundary_warnings, hint)
+    return compare_proposal(review, pages, physical, records, unit['boundary_warnings'], hint)
 
 
 def reconciliation(records, results, unassigned, complete):
