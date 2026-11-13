@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
 from bulk_review import (BULK_VERSION, INDEX_WINDOW, MAX_PROPOSALS, TableError, coverage_notes, index_pages, issue,
-                         make_units, reconciliation, render_pages, review_unit)
+                         index_context_numbers, make_units, reconciliation, render_pages, review_unit)
 
 # Bound RAM and API load across users; each proposal also shares the single-review API gate.
 _bulk_gate = Lock()
@@ -126,8 +126,11 @@ class BulkJob:
                 return
             start = len(self.index) + 1
             numbers = list(range(start, min(start + INDEX_WINDOW, self.page_count + 1)))
-            pages = render_pages(self.data, numbers)
-            result = await index_pages(pages, numbers, credential=credential, model=self.model)
+            context_numbers = index_context_numbers(self.index)
+            pages = render_pages(self.data, context_numbers + numbers)
+            context_count = len(context_numbers)
+            result = await index_pages(pages[context_count:], numbers, credential=credential, model=self.model,
+                                       context=list(zip(context_numbers, pages[:context_count])))
             del pages
             with self._lock:
                 self.index.extend(result)

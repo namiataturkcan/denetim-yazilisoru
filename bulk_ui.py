@@ -154,14 +154,16 @@ def render_progress(job, credential, authorize):
 
 def render_findings(snapshot):
     findings = snapshot['issues']
+    errors = [f for f in findings if f['status'] == 'uyari']
+    suspects = [f for f in findings if f['status'] != 'uyari']
     st.subheader('Toplu inceleme sonucu')
     for note in snapshot.get('coverage_notes', []):
         st.info(note)
     a, b, c, d = st.columns(4)
     a.metric('İşlenen belge', snapshot['processed'] - snapshot['failed'])
     b.metric('KKBS ile eşleşen', f"{snapshot.get('matched', 0)} / {snapshot.get('expected_count', 0)}")
-    c.metric('Hatalı bulgu', sum(f['status'] == 'uyari' for f in findings))
-    d.metric('Şüpheli bulgu', sum(f['status'] == 'belirsiz' for f in findings))
+    c.metric('Hatalı bulgu', len(errors))
+    d.metric('Şüpheli bulgu', len(suspects))
     if (snapshot.get('proposal_count') is not None and snapshot.get('expected_count') is not None
             and snapshot['proposal_count'] != snapshot['expected_count']):
         st.warning(f"PDF’de {snapshot['proposal_count']} belge başlangıcı, Excel’de {snapshot['expected_count']} önerge var. "
@@ -172,28 +174,23 @@ def render_findings(snapshot):
         st.error(f"KKBS karşılaştırması tamamlanamadı: {snapshot.get('matched', 0)} / {snapshot.get('expected_count', 0)} kayıt eşleşti. "
                  'Eşleşmeyen belgelerin milletvekili ve bakanlık bilgileri KKBS ile karşılaştırılamadı; '
                  'bu rapor grubun son kontrolü olarak kullanılamaz.')
-    elif findings:
-        st.warning('Aşağıda yalnızca hatalı veya şüpheli bulgular var. PDF sayfaları, dosyanın başından itibaren 1’den sayılır.')
-    else:
+    elif not findings:
         st.success('Seçilen grubun şekil ve KKBS karşılaştırmasında hatalı veya şüpheli bulgu saptanmadı.')
-    if findings:
-        rows = issue_rows(findings)
-        st.dataframe(rows, hide_index=True, width='stretch',
-                     column_config={'Açıklama': st.column_config.TextColumn(width='large')})
-        with st.expander('Açıklamaları tam metin göster'):
-            choices = list(dict.fromkeys((row['Esas No'], row['PDF sayfası']) for row in rows))
-            choice = st.selectbox('Bulgu ayrıntısı', choices, format_func=lambda x: f'{x[0]} · PDF sayfası {x[1]}')
-            for row in rows:
-                if (row['Esas No'], row['PDF sayfası']) != choice:
-                    continue
-                tone = 'uyari' if row['Sonuç'] == 'Hatalı' else 'belirsiz'
-                values = ''.join(f'<p><strong>{label}:</strong> {escape(row[label])}</p>'
-                                 for label in ('KKBS', 'Belge') if row[label])
-                st.markdown(f'<div class="check-card {tone}"><div class="check-heading">'
-                            f'{escape(row["Kontrol"])} · {escape(row["Sonuç"])}</div>'
-                            f'<p>{escape(row["Açıklama"])}</p>{values}</div>', unsafe_allow_html=True)
+    st.caption('PDF sayfaları dosyanın başından itibaren 1’den sayılır. Uygun önergeler listelenmez.')
+    st.subheader('Hatalı bulgular')
+    if errors:
+        render_finding_table(errors)
+        with st.expander('Hata açıklamalarını tam metin göster'):
+            render_finding_details(errors, 'bulk_error_detail')
+    elif suspects:
+        st.info('Kesin hata saptanmadı. Şüpheli bulgular aşağıdaki ayrı bölümde; bu sonuç tüm önergelerin uygun olduğu anlamına gelmez.')
     else:
-        st.caption('Şu ana kadar listelenecek hata/şüphe yok.' if snapshot['state'] != 'complete' else 'Uygun önergeler ayrı ayrı listelenmez.')
+        st.caption('Şu ana kadar listelenecek hata yok.' if snapshot['state'] != 'complete' else 'Hatalı bulgu yok.')
+    if suspects:
+        with st.expander(f'Şüpheli bulguları incele ({len(suspects)})', expanded=False):
+            st.caption('Okunamayan alanlar, OCR uyuşmazlıkları ve doğrulanamayan eşleşmeler. Bunlar kesin hata olarak değerlendirilmez.')
+            render_finding_table(suspects)
+            render_finding_details(suspects, 'bulk_suspect_detail')
     export = {**snapshot, 'scope': list(('Şekil', 'Milletvekili', 'Seçim çevresi', 'Muhatap bakanlık', 'Muhatap bakan')),
               'excluded': ['Tarih', 'Özet'], 'complete': bool(snapshot.get('complete', False))}
     suffix = 'sonuc' if export['complete'] else 'eksik-karsilastirma' if snapshot['state'] == 'complete' else 'ara-rapor'
@@ -202,3 +199,24 @@ def render_findings(snapshot):
                          f'toplu-inceleme-{suffix}.csv', 'text/csv', on_click='ignore')
     right.download_button('İnceleme raporunu indir (JSON)', json.dumps(export, ensure_ascii=False, indent=2),
                           f'toplu-inceleme-{suffix}.json', 'application/json', on_click='ignore')
+
+
+def render_finding_table(findings):
+    st.dataframe(issue_rows(findings), hide_index=True, width='stretch',
+                 column_config={'Açıklama': st.column_config.TextColumn(width='large')})
+
+
+def render_finding_details(findings, widget_key):
+    rows = issue_rows(findings)
+    choices = list(dict.fromkeys((row['Esas No'], row['PDF sayfası']) for row in rows))
+    choice = st.selectbox('Bulgu ayrıntısı', choices, key=widget_key,
+                          format_func=lambda x: f'{x[0]} · PDF sayfası {x[1]}')
+    for row in rows:
+        if (row['Esas No'], row['PDF sayfası']) != choice:
+            continue
+        tone = 'uyari' if row['Sonuç'] == 'Hatalı' else 'belirsiz'
+        values = ''.join(f'<p><strong>{label}:</strong> {escape(row[label])}</p>'
+                         for label in ('KKBS', 'Belge') if row[label])
+        st.markdown(f'<div class="check-card {tone}"><div class="check-heading">'
+                    f'{escape(row["Kontrol"])} · {escape(row["Sonuç"])}</div>'
+                    f'<p>{escape(row["Açıklama"])}</p>{values}</div>', unsafe_allow_html=True)

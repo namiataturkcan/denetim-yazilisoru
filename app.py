@@ -12,6 +12,7 @@ import pymupdf
 from recipient_validation import validate_recipient, extract_recipients
 from constituency_validation import validate_constituency
 from reading_validation import ReadingComparison, damaged_ocr, evidence_present, ocr_noise, tokens
+from salutation_validation import salutation_text, validate_salutation
 from pdf_processing import render_scale, serialized_pdf_work
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -24,10 +25,10 @@ ROOT = Path(__file__).parent
 RULES = json.loads((ROOT / "rules.json").read_text())
 MEMBER_REFERENCE = json.loads((ROOT / "member_reference.json").read_text())
 SUMMARY_STYLE = json.loads((ROOT / "summary_style.json").read_text())
-RELEASE = "2026.11.13.2"
+RELEASE = "2026.11.13.3"
 # Changes to either the validation code or the user's sources invalidate old reports.
 _revision_files = ("app.py", "reading_validation.py", "recipient_validation.py",
-                   "constituency_validation.py", "annotations.py", "pdf_processing.py",
+                   "constituency_validation.py", "salutation_validation.py", "annotations.py", "pdf_processing.py",
                    "rules.json", "member_reference.json", "summary_style.json")
 ANALYSIS_VERSION = RELEASE + "-" + hashlib.sha256(
     b"\0".join((ROOT / name).read_bytes() for name in _revision_files)).hexdigest()[:12]
@@ -210,7 +211,10 @@ async def _analyze(pages, *, credential=None, model=None, response_format=Review
     reading_uncertain sadece o kontrolün dayanağı okunamıyorsa true olsun. Sayfanın başka
     yerindeki imza/kaşe/kelime belirsizliğini tüm kontrollere yayma. Eksik ama açıkça eksik
     olan alan uyari; net okunan bir alan sırf sayfanın başka yerinde belirsizlik var diye belirsiz olmasın.
-    Hitap verilen ifadeyle aynı olmalı. Milletvekili adını ve seçim çevresini imza bölümünden
+    Hitap Türkiye Büyük Millet Meclisi Başkanlığına olmalı. BAŞKANLIĞINA ve BAŞKANLIĞI’NA
+    (düz veya kıvrımlı kesme işaretiyle) eşdeğer ve geçerlidir. Bu farkı hitap, harf/yazım
+    kontrolünde veya okuma belirsizliğinde hata sayma; metne özgün yazımı aynen aktar.
+    Milletvekili adını ve seçim çevresini imza bölümünden
     signatories listesine birebir çıkar: page, name, constituency, evidence (ad ve ili içeren
     özgün imza bloğu), name_uncertain, constituency_uncertain. Birden fazla imza varsa hepsini çıkar.
     Belgede konu olarak anılan illeri seçim çevresi sanma. İl yoksa boş bırak; okunamıyorsa
@@ -273,11 +277,15 @@ def finalize(review: Review, pages, *, member_reference=None):
     for c in review.checks:
         reading = readings[c.page]
         context = constituency_details.get("highlight_context", c.quote) if c.kind == "secim_cevresi" and constituency_details else c.quote
+        heading_check = c.kind == 'hitap' or (c.kind == 'harf'
+            and salutation_text(c.quote).rstrip(' .:') == salutation_text(RULES['salutation']))
+        disagrees = (validate_salutation(c, reading.text, pages[c.page-1]['ocr'], RULES['salutation'])
+                     if heading_check else alignments[c.page].disagrees(context))
         if c.reading_uncertain or "[OKUNAMADI]" in c.quote or (c.quote and not evidence_present(reading.text, c.quote)) or (not c.quote and c.status == "uygun"):
             if c.status != "belirsiz":
                 c.explanation = "İlgili alanın okuması/dayanağı doğrulanamadı; insan kontrolü gerekiyor."
             c.status = "belirsiz"
-        elif alignments[c.page].disagrees(context):
+        elif disagrees:
             if c.status != "belirsiz":
                 c.explanation = "İlgili alanda PDF/OCR ile görsel okuma arasında anlamlı sözcük farkı var; insan kontrolü gerekiyor."
             c.status = "belirsiz"

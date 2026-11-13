@@ -1,6 +1,7 @@
 {
   "version": "2026-10-19-user-rules",
   "salutation": "Türkiye Büyük Millet Meclisi Başkanlığına",
+  "salutation_variants": ["TÜRKİYE BÜYÜK MİLLET MECLİSİ BAŞKANLIĞINA", "TÜRKİYE BÜYÜK MİLLET MECLİSİ BAŞKANLIĞI’NA", "TÜRKİYE BÜYÜK MİLLET MECLİSİ BAŞKANLIĞI'NA"],
   "recipients": {
     "Cumhurbaşkanı Yardımcısı": "Cevdet YILMAZ",
     "Adalet Bakanı": "Akın GÜRLEK",

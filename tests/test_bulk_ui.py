@@ -122,3 +122,35 @@ def test_processed_batch_with_two_of_102_matches_is_not_a_completed_review():
     assert all('eksik-karsilastirma' in call.args[3] for call in download.call_args_list)
     exported = json.loads(download.call_args_list[1].args[2])
     assert not exported['complete'] and not exported['matching_complete']
+
+
+def test_errors_are_primary_and_suspects_are_collapsed_but_exports_keep_both():
+    import json
+    errors = [issue(50832, [180], 'uyari', 'KKBS · Milletvekili', 'Ad farklı', 'Cengiz Çiçek', 'Çiçek OTLU')]
+    suspects = [issue(50833, [182], 'belirsiz', 'Esas numarası', 'Kaşe silik')]
+    snapshot = {'state': 'complete', 'processed': 2, 'failed': 0, 'complete': False,
+                'matched': 1, 'expected_count': 2, 'issues': errors + suspects}
+    with patch('streamlit.delta_generator.DeltaGenerator.download_button', autospec=True, return_value=False) as download:
+        at = AppTest.from_string('from bulk_ui import render_findings\nrender_findings('+repr(snapshot)+')').run()
+    assert not at.exception
+    assert at.dataframe[0].value['Sonuç'].tolist() == ['Hatalı']
+    suspect_section = next(e for e in at.expander if e.label.startswith('Şüpheli bulguları incele'))
+    assert not suspect_section.proto.expanded
+    assert suspect_section.dataframe[0].value['Sonuç'].tolist() == ['Şüpheli']
+    assert len(at.selectbox) == 2
+    assert at.selectbox(key='bulk_error_detail').value == ('7/50832', '180')
+    assert at.selectbox(key='bulk_suspect_detail').value == ('7/50833', '182')
+    assert any('tamamlanamadı' in e.value for e in at.error)
+    exported = json.loads(download.call_args_list[1].args[2])
+    assert exported['issues'] == errors + suspects
+    assert '7/50833' in download.call_args_list[0].args[2].decode('utf-8-sig')
+
+
+def test_only_suspects_is_not_presented_as_all_clear():
+    snapshot = {'state': 'complete', 'processed': 1, 'failed': 0, 'complete': True,
+                'matched': 1, 'expected_count': 1,
+                'issues': [issue(50832, [180], 'belirsiz', 'Belge okuması', 'İmza okunamadı')]}
+    at = AppTest.from_string('from bulk_ui import render_findings\nrender_findings('+repr(snapshot)+')').run()
+    assert not at.exception and not at.success
+    assert any('uygun olduğu anlamına gelmez' in i.value for i in at.info)
+    assert not at.expander[0].proto.expanded
