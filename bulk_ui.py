@@ -172,7 +172,7 @@ def render_findings(snapshot):
         st.info('Bu ara rapordur. Bekleyen önergeler uygun kabul edilmez; tüm grup henüz incelenmedi.')
     elif not snapshot.get('complete', False):
         st.error(f"KKBS karşılaştırması tamamlanamadı: {snapshot.get('matched', 0)} / {snapshot.get('expected_count', 0)} kayıt eşleşti. "
-                 'Eşleşmeyen belgelerin milletvekili ve bakanlık bilgileri KKBS ile karşılaştırılamadı; '
+                 'Bazı belgelerin eşleşmesi veya sayfa aidiyeti doğrulanamadı; '
                  'bu rapor grubun son kontrolü olarak kullanılamaz.')
     elif not findings:
         st.success('Seçilen grubun şekil ve KKBS karşılaştırmasında hatalı veya şüpheli bulgu saptanmadı.')
