@@ -642,7 +642,7 @@ Konuda adı geçen kişileri muhatap sayma. Bakan adını kendi bilgine göre d�
 Milletvekili adları ve seçim çevreleri signatories içinde birebir yer almalı. Bu aşamada KKBS değerleri sana verilmez.'''
 
 
-async def review_unit(data, unit, records, *, credential, model, hint=None):
+async def review_unit(data, unit, records, *, credential, model, hint=None, reading_sink=None):
     physical = unit['pages']
     if len(physical) > service.MAX_PAGES:
         return {'number': None, 'pages': physical, 'matched': False, 'failed': False,
@@ -651,6 +651,12 @@ async def review_unit(data, unit, records, *, credential, model, hint=None):
     pages = render_pages(data, physical, stamp_details=True)
     review = await service.analyze(pages, credential=credential, model=model,
                                    response_format=BulkReading, extra_instructions=BULK_INSTRUCTIONS)
+    if reading_sink is not None:
+        # Save a paid reading before deterministic validation, so a validation
+        # change or failure does not require paying to read these images again.
+        reading_sink({'physical_pages': list(physical), 'review': review.model_dump(),
+                      'pages': [{k: p[k] for k in ('ocr', 'ocr_source', 'ocr_original', 'stamp_ocr') if k in p}
+                                for p in pages], 'boundary_warnings': list(unit['boundary_warnings'])})
     return compare_proposal(review, pages, physical, records, unit['boundary_warnings'], hint)
 
 

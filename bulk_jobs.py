@@ -1,5 +1,7 @@
 """Session-owned, resumable bulk work. Background threads never call Streamlit."""
 import asyncio
+import hashlib
+import json
 from collections import defaultdict
 from copy import deepcopy
 from threading import Event, Lock, RLock, Thread
@@ -9,7 +11,7 @@ from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
 from bulk_review import (BULK_VERSION, INDEX_WINDOW, MAX_PROPOSALS, TableError, coverage_notes, index_pages, issue,
-                         index_context_numbers, make_units, reconciliation, render_pages, review_unit)
+                         IndexedPage, index_context_numbers, make_units, reconciliation, render_pages, review_unit)
 
 # Bound RAM and API load across users; each proposal also shares the single-review API gate.
 _bulk_gate = Lock()
@@ -49,9 +51,19 @@ def matching_coverage(records, results, unassigned):
 
 
 class BulkJob:
-    def __init__(self, data, page_count, records, model, source_id):
+    def __init__(self, data, page_count, records, model, source_id, *, test_pages=None, single_proposal=False):
         self.data = data
-        self.page_count = page_count
+        self.pdf_sha256 = hashlib.sha256(data).hexdigest()
+        self.original_page_count = page_count
+        self.is_test = test_pages is not None
+        self.page_numbers = list(test_pages) if self.is_test else list(range(1, page_count+1))
+        if (not self.page_numbers or self.page_numbers != sorted(set(self.page_numbers))
+                or any(type(p) is not int or p < 1 or p > page_count for p in self.page_numbers)
+                or (self.is_test and (len(self.page_numbers) > 10
+                    or self.page_numbers != list(range(self.page_numbers[0], self.page_numbers[-1]+1))))
+                or (single_proposal and not self.is_test)):
+            raise TableError('Deneme için PDF’den en fazla 10 geçerli sayfa seçin.')
+        self.page_count = len(self.page_numbers)
         self.records = list(records)
         self.model = model
         self.source_id = source_id
@@ -64,9 +76,15 @@ class BulkJob:
         self.phase = 'Sayfa sınırları'
         self.message = ''
         self.index = []
+        if single_proposal:
+            self.index = [IndexedPage(page=p, kind='start' if i == 0 else 'continuation',
+                                      explanation='Kullanıcı bu deneme aralığının tek önerge olduğunu belirtti.')
+                          for i, p in enumerate(self.page_numbers)]
         self.units = None
         self.unassigned = []
         self.results = {}
+        self.readings = {}
+        self._cache_export = None
 
     @property
     def running(self):
@@ -124,8 +142,7 @@ class BulkJob:
         while len(self.index) < self.page_count:
             if self._should_stop():
                 return
-            start = len(self.index) + 1
-            numbers = list(range(start, min(start + INDEX_WINDOW, self.page_count + 1)))
+            numbers = self.page_numbers[len(self.index):len(self.index) + INDEX_WINDOW]
             context_numbers = index_context_numbers(self.index)
             pages = render_pages(self.data, context_numbers + numbers)
             context_count = len(context_numbers)
@@ -148,8 +165,13 @@ class BulkJob:
                 return
             # Sequence is only a labelled candidate for unreadable stamps, never a verified match.
             hint = expected[index] if len(expected) == len(self.units) else None
+            def save_reading(reading):
+                with self._lock:
+                    self.readings[index] = reading
+                    self._cache_export = None
             try:
-                result = await review_unit(self.data, unit, self.records, credential=credential, model=self.model, hint=hint)
+                result = await review_unit(self.data, unit, self.records, credential=credential, model=self.model,
+                                           hint=hint, reading_sink=save_reading)
             except (APIStatusError, APIConnectionError, APITimeoutError) as exc:
                 raise exc  # Pause instead of burning credits on every remaining proposal.
             except HTTPException as exc:
@@ -177,11 +199,28 @@ class BulkJob:
             coverage = matching_coverage(self.records, results, self.unassigned)
             processing_complete = self.state == 'complete' and not any(r['failed'] for r in results)
             return {'version': self.version, 'source_id': self.source_id, 'state': self.state,
+                    'is_test': self.is_test, 'tested_pages': list(self.page_numbers),
+                    'original_page_count': self.original_page_count,
                     'phase': self.phase, 'message': self.message,
                     'page_count': self.page_count, 'indexed_pages': len(self.index),
                     'proposal_count': len(self.units) if self.units is not None else None,
                     'processed': len(results), 'failed': sum(r['failed'] for r in results),
                     **coverage, 'processing_complete': processing_complete,
-                    'complete': processing_complete and coverage['matching_complete'],
+                    'complete': processing_complete and coverage['matching_complete'] and not self.is_test,
                     'coverage_notes': coverage_notes(self.records),
-                    'issues': deepcopy(reconciliation(self.records, results, self.unassigned, self.state == 'complete'))}
+                    'issues': deepcopy(reconciliation(self.records, results, self.unassigned,
+                                                       self.state == 'complete' and not self.is_test))}
+
+    def reading_cache(self):
+        """A user-owned download, not a shared server cache; no images or keys."""
+        with self._lock:
+            if not self.readings:
+                return None
+            if self._cache_export is None:
+                self._cache_export = json.dumps({
+                    'format': 'onerge-readings-v1', 'version': self.version, 'model': self.model,
+                    'pdf_sha256': self.pdf_sha256,
+                    'original_page_count': self.original_page_count,
+                    'entries': [self.readings[k] for k in sorted(self.readings)],
+                }, ensure_ascii=False).encode('utf-8')
+            return self._cache_export
