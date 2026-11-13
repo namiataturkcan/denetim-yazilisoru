@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 import app as service
 from incoming_papers import MAX_COLUMNS, MAX_ROWS, TableError, _workbook, key, parse_number, term_name
-from pdf_processing import render_scale, serialized_pdf_work
+from pdf_processing import MAX_IMAGE_EDGE, render_scale, serialized_pdf_work
 from reading_validation import evidence_present, field_present, serious_disagreement
 from recipient_validation import normalize
 
@@ -266,7 +266,7 @@ def inspect_pdf(data):
 
 
 @serialized_pdf_work
-def render_pages(data, numbers):
+def render_pages(data, numbers, *, stamp_details=False):
     """Render only the current window/proposal; never retain the full scan as images."""
     pages = []
     with pymupdf.open(stream=data, filetype='pdf') as doc:
@@ -278,8 +278,21 @@ def render_pages(data, numbers):
                 raise TableError('Geçersiz PDF sayfa boyutu.')
             pix = page.get_pixmap(matrix=pymupdf.Matrix(render_scale(page), render_scale(page)), alpha=False)
             text = page.get_text()
+            # The numbered packet templates stamp the ID in the upper-right
+            # margin. Keep this positioned, original evidence separate from the
+            # body OCR refresh, which can improve words but corrupt a digit.
+            stamp_words = [w for w in page.get_text('words')
+                           if w[0] > page.rect.width * .6 and w[1] < page.rect.height * .2
+                           and re.fullmatch(r'(?:7/)?[1-9][0-9]{4,8}', w[4])]
+            stamp_ocr = [{'value': w[4], 'rect': list(w[:4])} for w in stamp_words]
             pages.append({'image': base64.b64encode(pix.tobytes('png')).decode(), 'ocr': text,
-                          'ocr_source': 'pdf_text' if text.strip() else 'none'})
+                          'ocr_source': 'pdf_text' if text.strip() else 'none',
+                          'stamp_ocr': stamp_ocr})
+            if stamp_details:
+                clip = pymupdf.Rect(page.rect.width * .5, 0, page.rect.width, page.rect.height * .2)
+                scale = min(4, MAX_IMAGE_EDGE / max(clip.width, clip.height))
+                detail = page.get_pixmap(clip=clip, matrix=pymupdf.Matrix(scale, scale), alpha=False)
+                pages[-1]['stamp_image'] = base64.b64encode(detail.tobytes('png')).decode()
     return pages
 
 
@@ -359,7 +372,22 @@ def issue(number, pages, status, field, explanation, expected='', actual='', inf
             'explanation': explanation, 'expected': expected, 'actual': actual, 'inferred': inferred}
 
 
-def reading_problem(field, review, pages):
+def stamp_number(value):
+    """Ignore printed digit spacing and 7/ formatting, never repair a digit."""
+    value = re.sub(r'^Esas\s*(?:No|Numarası)\s*:?\s*', '', value.strip(), flags=re.IGNORECASE)
+    if not re.fullmatch(r'(?:7\s*/\s*)?[0-9](?:[0-9 \t]*[0-9])?', value):
+        raise ValueError('Geçersiz esas numarası')
+    return parse_number(re.sub(r'[ \t]', '', value))
+
+
+def number_in_quote(value, quote):
+    try:
+        return stamp_number(value) == stamp_number(quote)
+    except ValueError:
+        return False
+
+
+def reading_problem(field, review, pages, *, number_field=False):
     if field.page < 1 or field.page > len(pages):
         return 'Okunan alanın sayfa numarası geçersiz.'
     if field.uncertain:
@@ -373,8 +401,21 @@ def reading_problem(field, review, pages):
         return 'Dayanak alıntıda okunamayan bölüm var.'
     if not evidence_present(reading.text, field.quote):
         return 'Dayanak alıntı, görselden aktarılan sayfa metninde aynen bulunamadı.'
-    if not field_present(field.quote, field.value):
+    if not field_present(field.quote, field.value) and not (number_field and number_in_quote(field.value, field.quote)):
         return 'Okunan değer, dayanak alıntıda aynen bulunamadı.'
+    if number_field and pages[field.page - 1].get('stamp_ocr'):
+        # This source is selected by location/format before seeing the model's
+        # answer or KKBS values. Never pick whichever OCR happens to agree.
+        candidates = {stamp_number(item['value']) for item in pages[field.page - 1]['stamp_ocr']}
+        if len(candidates) != 1:
+            return 'Kaşe bölgesinin özgün PDF metninde birden fazla numara var; eşleşme doğrulanamadı.'
+        try:
+            observed = stamp_number(field.value)
+        except ValueError:
+            return 'Okunan değer geçerli bir esas numarası biçiminde değil.'
+        if observed not in candidates:
+            return 'Görselde okunan esas numarası, kaşe bölgesinin özgün PDF metniyle uyuşmuyor.'
+        return ''
     if serious_disagreement(reading.text, pages[field.page - 1]['ocr'], field.quote):
         return 'Bu alanda görsel okuma ile bağımsız PDF/OCR metni uyuşmuyor.'
     return ''
@@ -397,10 +438,10 @@ def title_key(value):
 def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(), hint=None):
     """Return only errors/uncertainties, with physical page numbers and exact source evidence."""
     findings, number, record = [], None, None
-    number_problem = reading_problem(review.number, review, pages)
+    number_problem = reading_problem(review.number, review, pages, number_field=True)
     if not number_problem:
         try:
-            number = parse_number(review.number.value)
+            number = stamp_number(review.number.value)
         except ValueError:
             number_problem = 'Okunan değer geçerli bir esas numarası biçiminde değil.'
     inferred = number is None and hint is not None
@@ -414,7 +455,9 @@ def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(
                               actual=review.number.value, inferred=inferred))
         findings[-1]['reading_evidence'] = {'value': review.number.value, 'quote': review.number.quote,
                                            'local_page': review.number.page, 'uncertain': review.number.uncertain,
-                                           'rejection_reason': number_problem}
+                                           'rejection_reason': number_problem,
+                                           'stamp_ocr': pages[review.number.page - 1].get('stamp_ocr', [])
+                                           if 1 <= review.number.page <= len(pages) else []}
     else:
         matches = [r for r in records if r.number == number]
         if len(matches) == 1:
@@ -428,8 +471,16 @@ def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(
     for warning in boundary_warnings:
         findings.append(issue(display_number, physical_pages, 'belirsiz', 'Sayfa eşleştirme', warning, inferred=inferred))
     reference = {'source': {'type': 'uploaded_kkbs'}, 'members': {}, 'invalid_constituency_labels': ['Dersim']}
-    if record and record.member and record.province:
-        reference['members'][record.member] = record.province
+    # A wrong KKBS owner must not make a clearly read, source-backed province
+    # look unreadable. Formal constituency validation uses the consistent pairs
+    # in this uploaded group; row-to-document comparisons below remain exact-ID.
+    member_rows = defaultdict(list)
+    for source in records:
+        if source.member and source.province:
+            member_rows[normalize(source.member)].append(source)
+    for sources in member_rows.values():
+        if len({normalize(source.province) for source in sources}) == 1:
+            reference['members'][sources[0].member] = sources[0].province
     finalized = service.finalize(review, pages, member_reference=reference)
     for check in finalized['review']['checks']:
         if check['status'] == 'uygun':
@@ -476,9 +527,11 @@ def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(
 
 
 BULK_INSTRUCTIONS = '''Bu bir toplu son kontroldür. Tarih ve özet KKBS ile karşılaştırılmayacak; summary boş olabilir.
-Bu tek önergenin üzerindeki esas numarasını number alanına çıkar: value (ör. 7/50000), page (buradaki yerel sayfa),
+Bu tek önergenin üzerindeki esas numarasını number alanına çıkar: value (belgede 50000 yazıyorsa 50000, 7/50000 yazıyorsa 7/50000), page (buradaki yerel sayfa),
 quote (okunan metinden birebir kaşe/numara alıntısı), uncertain. Esas numarasını genel evrak, tarih, soru veya kanun numarasıyla karıştırma.
-Kaşeyi metne de aynen aktar. Silik/şüpheli rakamları tahminle tamamlama. Numara yoksa value ve quote boş, uncertain true olsun.
+Kaşeyi metne de aynen aktar. Yakın plan görüntüsü aynı fiziksel sayfanın sağ üst köşesidir; ayrı sayfa sayma.
+Yakın plandaki esas kaşesini de incele; sol üstteki parti Sayı numarasını esas numarası sayma.
+Silik/şüpheli rakamları tahminle tamamlama. Numara yoksa value ve quote boş, uncertain true olsun.
 Cevap istenen muhatabın unvanını recipient_title ve adını recipient_name alanlarına aynı yapıyla çıkar.
 Konuda adı geçen kişileri muhatap sayma. Bakan adını kendi bilgine göre düzeltme. Birden fazla muhatap varsa alanı uncertain yap.
 Milletvekili adları ve seçim çevreleri signatories içinde birebir yer almalı. Bu aşamada KKBS değerleri sana verilmez.'''
@@ -490,7 +543,7 @@ async def review_unit(data, unit, records, *, credential, model, hint=None):
         return {'number': None, 'pages': physical, 'matched': False, 'failed': False,
                 'issues': [issue(hint, physical, 'belirsiz', 'Sayfa eşleştirme',
                                   'Bir önerge için 10 sayfa sınırı aşıldı; taramadaki önerge sınırlarını kontrol edin.', inferred=hint is not None)]}
-    pages = render_pages(data, physical)
+    pages = render_pages(data, physical, stamp_details=True)
     review = await service.analyze(pages, credential=credential, model=model,
                                    response_format=BulkReading, extra_instructions=BULK_INSTRUCTIONS)
     return compare_proposal(review, pages, physical, records, unit['boundary_warnings'], hint)

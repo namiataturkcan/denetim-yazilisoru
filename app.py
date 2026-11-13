@@ -24,7 +24,7 @@ ROOT = Path(__file__).parent
 RULES = json.loads((ROOT / "rules.json").read_text())
 MEMBER_REFERENCE = json.loads((ROOT / "member_reference.json").read_text())
 SUMMARY_STYLE = json.loads((ROOT / "summary_style.json").read_text())
-RELEASE = "2026.11.13.1"
+RELEASE = "2026.11.13.2"
 # Changes to either the validation code or the user's sources invalidate old reports.
 _revision_files = ("app.py", "reading_validation.py", "recipient_validation.py",
                    "constituency_validation.py", "annotations.py", "pdf_processing.py",
@@ -234,6 +234,9 @@ async def _analyze(pages, *, credential=None, model=None, response_format=Review
     for number, page in enumerate(pages, 1):
         content.extend([{"type": "input_text", "text": f"Sayfa {number}"},
                         {"type": "input_image", "image_url": "data:image/png;base64," + page["image"], "detail": "high"}])
+        if page.get('stamp_image'):
+            content.extend([{"type": "input_text", "text": f"Sayfa {number}: sağ üst kaşe bölgesinin yakın planı; aynı sayfa, yeni belge değil."},
+                            {"type": "input_image", "image_url": "data:image/png;base64," + page['stamp_image'], "detail": "high"}])
     # Embedded OCR is deliberately not sent: vision reading must be independent.
     async with AsyncOpenAI(api_key=credential or api_key(), timeout=120, max_retries=0) as client:
         response = await client.responses.parse(
