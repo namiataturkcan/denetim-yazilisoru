@@ -14,7 +14,7 @@ from recipient_validation import normalize
 VERSION = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
 ALIASES = {
     'document': ('Genel Evrak Numarası', 'Genel Evrak No', 'Evrak Kayıt No', 'Evrak Numarası',
-                 'Evrak No', 'EBYS Evrak No', 'EBYS No', 'Belge Numarası', 'Belge No', 'Evrak Sayısı', 'Sayı'),
+                 'Evrak No', 'EBYS Evrak No', 'EBYS No', 'Belge Numarası', 'Belge No', 'Barkod No', 'Barkod Numarası', 'Evrak Sayısı', 'Sayı'),
     'member': ('Önerge Sahibi', 'Soru Sahibi', 'Milletvekili Adı Soyadı', 'Milletvekili Adı', 'Milletvekili',
                'Vekil Adı', 'Adı Soyadı', 'Gönderen', 'Geldiği Yer', 'Gelen Yer'),
     'ministry': ('Önerge Muhatabı', 'Muhatap Unvanı', 'Muhatap Ünvanı', 'Muhatap', 'Bakanlık Adı',
@@ -157,6 +157,19 @@ def compare_members(left, right, known, full_names=()):
         return 'uyari', 'İki kayıtta farklı milletvekili adları var; önergenin aslıyla kontrol edin.'
     if sorted(fa.split()) == sorted(fb.split()):
         return 'yazim', 'Ad ve soyadı sırası farklı; adın tüm sözcükleri aynı.'
+    wa, wb = fa.split(), fb.split()
+    if min(len(wa), len(wb)) >= 2 and abs(len(wa)-len(wb)) == 1:
+        short, long = (wa, wb) if len(wa) < len(wb) else (wb, wa)
+        def same_prefix(words):
+            if len(words) != len(long):
+                return False
+            prefix, given = ''.join(words[:len(short)]), ''.join(short)
+            return prefix == given or (min(len(prefix), len(given)) >= 10 and one_edit(prefix, given))
+        if same_prefix(long):
+            matches = {folded(name) for name in full_names if same_prefix(folded(name).split())}
+            if matches == {' '.join(long)}:
+                return 'yazim', 'Son ad/soyad bileşeni bir kaynakta eksik; en az iki sözcükle ve en fazla bir harf farkıyla kaynaklarda tek tam ada eşleşti.'
+            return 'belirsiz', 'Ad/soyadın bir bileşeni eksik olabilir; kaynaklarda tek bir kişiyle eşleştirilemedi.'
     if min(len(ca), len(cb)) >= 8 and one_edit(ca, cb):
         possibilities = {name for name in known if abs(len(name)-len(cb)) <= 1 and one_edit(name, cb)}
         if possibilities == {ca}:
@@ -165,7 +178,6 @@ def compare_members(left, right, known, full_names=()):
     # Longer names can contain a short extra/missing syllable in one word.
     # Keep the other words exact and require a single candidate in the user's
     # reference + KKBS source, never a generic fuzzy match to arbitrary people.
-    wa, wb = fa.split(), fb.split()
     if (min(len(ca), len(cb)) >= 12 and len(wa) == len(wb)
             and sum(a != b for a, b in zip(wa, wb)) == 1 and within_two_edits(ca, cb)):
         possibilities = {name for name in known if within_two_edits(name, cb)}
@@ -306,22 +318,31 @@ def suggest_header(sheet):
     return 0 if ebys_subject_columns(sheet) else 1
 
 
+def sheet_score(sheet, side):
+    header = suggest_header(sheet)
+    headers = {key(v) for v in sheet.headers(header)}
+    mapped = sum(v is not None for v in suggest_mapping(sheet, header).values())
+    if side == 'kkbs':
+        return (bool(headers & {key('Genel Evrak No'), key('Genel Evrak Numarası')}),
+                'kkbs' in key(sheet.name), not bool(ebys_subject_columns(sheet)), mapped)
+    return (bool(headers & {key('Barkod No'), key('Barkod Numarası')}) or bool(ebys_subject_columns(sheet)),
+            any(v in key(sheet.name) for v in ('ebys', 'gelenevrak', 'incomingdocuments')), mapped)
+
+
+def suggest_sheet(previews, side):
+    return max(previews, key=lambda sheet: sheet_score(sheet, side)).name
+
+
 def suggest_sheet_pair(previews):
-    def kkbs_score(sheet):
-        mapping = suggest_mapping(sheet, suggest_header(sheet))
-        return ('kkbs' in key(sheet.name), not bool(ebys_subject_columns(sheet)),
-                sum(v is not None for v in mapping.values()))
-    kkbs = max(previews, key=kkbs_score)
+    kkbs = max(previews, key=lambda s: sheet_score(s, 'kkbs'))
     remaining = [s for s in previews if s.name != kkbs.name]
-    ebys = max(remaining, key=lambda s: (bool(ebys_subject_columns(s)),
-               any(v in key(s.name) for v in ('ebys', 'gelenevrak')),
-               sum(v is not None for v in suggest_mapping(s, suggest_header(s)).values())))
+    ebys = max(remaining, key=lambda s: sheet_score(s, 'ebys'))
     return kkbs.name, ebys.name
 
 
 def read_sheets(data, names, *, preview=False):
-    if len(names) < 2 or len(set(names)) != len(names):
-        raise TableError('KKBS ve EBYS için farklı çalışma sayfaları seçin.')
+    if not names or len(set(names)) != len(names):
+        raise TableError('Geçerli ve farklı çalışma sayfaları seçin.')
     book = _workbook(data)
     try:
         sheets = []

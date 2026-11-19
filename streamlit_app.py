@@ -41,9 +41,16 @@ def create_markings(data, result):
 
 def main():
     section = st.session_state.get("active_module")
-    titles = {"review": "Yazılı Soru Önergesi İncelemesi", "incoming": "Gelen Kağıt İşlemleri"}
+    # Keep sessions already using the comparison on their current workflow.
+    if section == 'review' and st.session_state.get('review_mode') == 'EBYS–KKBS karşılaştırması':
+        section = 'second_reader'
+        st.session_state['active_module'] = section
+        st.session_state.pop('review_mode', None)
+    titles = {"review": "Yazılı Soru Önergesi İncelemesi", "incoming": "Gelen Kağıt İşlemleri",
+              "second_reader": "İkinci Okuyucu İşlemleri"}
     title = titles.get(section, "Yazılı Soru İşlemleri")
-    subtitle = {"review": "Önergeleri inceleyin veya EBYS ile KKBS girişlerini karşılaştırın.",
+    subtitle = {"review": "Önergeleri tekli veya toplu olarak inceleyin.",
+                "second_reader": "Okuma öncesinde veya sonrasında KKBS ve EBYS girişlerini karşılaştırın.",
                 "incoming": "Cevaplanmamış önergeleri, esas numarası aralıklarını ve muhatapları listeleyin."}.get(section, "Yapmak istediğiniz işlemi seçin.")
     st.set_page_config(page_title=title, page_icon="📄", layout="wide")
     st.markdown("<style>" + Path(__file__).with_name("streamlit_style.css").read_text() + "</style>", unsafe_allow_html=True)
@@ -81,6 +88,9 @@ def main():
     if section == "incoming":
         render_incoming(RULES["recipients"])
         return
+    if section == 'second_reader':
+        render_entry_comparison(RULES['recipients'], MEMBER_REFERENCE['members'])
+        return
     render_review()
 
 
@@ -89,23 +99,23 @@ def select_module(name):
 
 
 def render_home():
-    left, right = st.columns(2, gap="large")
+    left, middle, right = st.columns(3, gap="large")
     with left:
-        st.markdown('<div class="module-card"><div class="module-number">01 · BELGE İNCELEMESİ</div><h2>Yazılı Soru Önergesi İncelemesi</h2><p>Tekli veya toplu önerge incelemesi yapın. EBYS–KKBS karşılaştırması ile iki rapordaki milletvekili ve bakanlık girişlerini kontrol edin.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="module-card"><div class="module-number">01 · BELGE İNCELEMESİ</div><h2>Yazılı Soru Önergesi İncelemesi</h2><p>Tekli veya toplu önerge incelemesi yapın. Şekil kontrollerini ve önerge ile KKBS bilgilerinin uyumunu inceleyin.</p></div>', unsafe_allow_html=True)
         st.button("Önerge incelemesine geç", type="primary", width="stretch", on_click=select_module, args=("review",))
-    with right:
+    with middle:
         st.markdown('<div class="module-card"><div class="module-number">02 · LİSTE İŞLEMLERİ</div><h2>Gelen Kağıt İşlemleri</h2><p>Memur işlemi veya uzman kontrolünü seçin. Excel’den ilan edilecek ya da ilan edilmiş önerge numaralarını ve bakanlıkları listeleyin.</p></div>', unsafe_allow_html=True)
         st.button("Gelen kağıt işlemlerine geç", type="primary", width="stretch", on_click=select_module, args=("incoming",))
+    with right:
+        st.markdown('<div class="module-card"><div class="module-number">03 · GİRİŞ KARŞILAŞTIRMASI</div><h2>İkinci Okuyucu İşlemleri</h2><p>Okuma öncesinde ayrı KKBS ve EBYS dosyalarını, okuma sonrasında birleşik Excel’i yükleyin. Milletvekili ve bakanlık girişlerini karşılaştırın.</p></div>', unsafe_allow_html=True)
+        st.button("İkinci okuyucu işlemlerine geç", type="primary", width="stretch", on_click=select_module, args=("second_reader",))
 
 
 def render_review():
     key = setting("ONERGE_DIRECT_API_KEY") or setting("ONERGE_API_KEY") or setting("OPENAI_API_KEY")
     job = st.session_state.get('bulk_job')
-    mode = st.radio('İnceleme türü', ['Tekli inceleme', 'Toplu inceleme', 'EBYS–KKBS karşılaştırması'], horizontal=True,
+    mode = st.radio('İnceleme türü', ['Tekli inceleme', 'Toplu inceleme'], horizontal=True,
                     key='review_mode', disabled=job is not None and job.running)
-    if mode == 'EBYS–KKBS karşılaştırması':
-        render_entry_comparison(RULES['recipients'], MEMBER_REFERENCE['members'])
-        return
     if mode == 'Toplu inceleme':
         render_bulk(key, setting('ONERGE_MODEL', 'gpt-4.1'),
                     lambda: bool(setting('APP_PASSWORD')) and st.session_state.get('authenticated')

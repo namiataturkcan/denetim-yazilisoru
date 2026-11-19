@@ -118,7 +118,7 @@ def test_subject_mention_cannot_replace_requested_addressee(target, expected):
 
 def test_ui_selects_independent_sources_and_prevents_unsafe_manual_override(monkeypatch):
     at = setup(monkeypatch)
-    with patch('streamlit.file_uploader', return_value=Upload(joined_workbook())), \
+    with patch('streamlit.file_uploader', return_value=[Upload(joined_workbook())]), \
          patch('app.analyze', side_effect=AssertionError('No API allowed')):
         at.session_state['entry_result'] = {'old': 'report'}
         at.session_state['entry_result_key'] = 'old-version'
@@ -145,7 +145,7 @@ def test_interrupted_sheet_detection_is_retried(monkeypatch):
                 st.rerun()
         return read_sheets(*args, **kwargs)
     at = setup(monkeypatch)
-    with patch('streamlit.file_uploader', return_value=Upload(joined_workbook())), \
+    with patch('streamlit.file_uploader', return_value=[Upload(joined_workbook())]), \
          patch('entry_comparison_ui.read_sheets', side_effect=interrupted):
         at.run()
         assert not at.exception and len(calls) == 2

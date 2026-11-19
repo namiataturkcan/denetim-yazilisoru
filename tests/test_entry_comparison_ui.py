@@ -10,19 +10,19 @@ from test_streamlit import configured
 class Upload:
     name = 'rapor.xlsx'
 
-    def __init__(self, data=None):
+    def __init__(self, data=None, name='rapor.xlsx'):
         self.data = data or workbook()
+        self.name = name
 
     def getvalue(self):
         return self.data
 
 
 def setup(monkeypatch):
-    at = configured(monkeypatch)
+    at = configured(monkeypatch, module="second_reader")
     for name in ('ONERGE_DIRECT_API_KEY', 'ONERGE_API_KEY', 'OPENAI_API_KEY'):
         monkeypatch.delenv(name, raising=False)
     login(at)
-    at.radio[0].set_value('EBYS–KKBS karşılaştırması').run()
     return at
 
 
@@ -32,7 +32,7 @@ def test_route_upload_compare_without_api_and_logout(monkeypatch):
         assert not at.exception and not at.error
         assert len(at.get('file_uploader')) == 1
         data = workbook(right=[[100, 'Cengiz Çiçek', 'Adalet Bakanı', '7/50000', None]])
-        with patch('streamlit.file_uploader', return_value=Upload(data)):
+        with patch('streamlit.file_uploader', return_value=[Upload(data)]):
             at.run()
             click(at, 'Girişleri karşılaştır')
             assert at.session_state['entry_result']['different'] == 1
@@ -45,13 +45,13 @@ def test_route_upload_compare_without_api_and_logout(monkeypatch):
 
 def test_file_and_mapping_changes_invalidate_result(monkeypatch):
     at = setup(monkeypatch)
-    with patch('streamlit.file_uploader', return_value=Upload()):
+    with patch('streamlit.file_uploader', return_value=[Upload()]):
         at.run()
         click(at, 'Girişleri karşılaştır')
         assert at.success
         next(s for s in at.selectbox if s.label == 'EBYS · Bakanlık / muhatap').set_value(1).run()
         assert 'entry_result' not in at.session_state and not at.get('download_button')
-    with patch('streamlit.file_uploader', return_value=Upload(workbook(right=[[100, 'Cengiz Çiçek', 'Adalet Bakanı']]))):
+    with patch('streamlit.file_uploader', return_value=[Upload(workbook(right=[[100, 'Cengiz Çiçek', 'Adalet Bakanı']]))]):
         at.run()
         assert 'entry_result' not in at.session_state
         click(at, 'Girişleri karşılaştır')
@@ -63,7 +63,7 @@ def test_file_and_mapping_changes_invalidate_result(monkeypatch):
 
 def test_sheet_change_clears_old_result_and_same_sheets_are_rejected(monkeypatch):
     at = setup(monkeypatch)
-    with patch('streamlit.file_uploader', return_value=Upload()):
+    with patch('streamlit.file_uploader', return_value=[Upload()]):
         at.run()
         click(at, 'Girişleri karşılaştır')
         next(s for s in at.selectbox if s.label == 'EBYS çalışma sayfası').set_value('KKBS').run()
@@ -82,7 +82,7 @@ def test_interrupted_reader_and_missing_cached_data_are_retried(monkeypatch):
             st.rerun()
         return read_sheets(*args, **kwargs)
     at = setup(monkeypatch)
-    with patch('streamlit.file_uploader', return_value=Upload()), patch('entry_comparison_ui.read_sheets', side_effect=interrupted):
+    with patch('streamlit.file_uploader', return_value=[Upload()]), patch('entry_comparison_ui.read_sheets', side_effect=interrupted):
         at.run()
         assert not at.exception and len(calls) == 2
         click(at, 'Girişleri karşılaştır')
@@ -94,7 +94,7 @@ def test_interrupted_reader_and_missing_cached_data_are_retried(monkeypatch):
 
 def test_no_common_id_is_not_green_and_control_list_is_collapsed(monkeypatch):
     at = setup(monkeypatch)
-    with patch('streamlit.file_uploader', return_value=Upload(workbook(right=[[999, 'Çiçek Otlu', 'Çevre Bakanı']]))):
+    with patch('streamlit.file_uploader', return_value=[Upload(workbook(right=[[999, 'Çiçek Otlu', 'Çevre Bakanı']]))]):
         at.run()
         click(at, 'Girişleri karşılaştır')
         assert not at.success
