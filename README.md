@@ -1,6 +1,6 @@
 # Yazılı Soru İşlemleri
 
-Parola korumalı Streamlit uygulaması, girişten sonra iki işlem sunar: **Yazılı Soru Önergesi İncelemesi** ve **Gelen Kağıt İşlemleri**. Önerge incelemesi PDF görüntülerini okuyup kullanıcı kurallarıyla doğrular. Gelen Kağıt İşlemleri, Excel veya yapıştırılan tablo üzerinden cevaplanmamış önerge aralıklarını ve muhatapları hesaplar.
+Parola korumalı Streamlit uygulaması, girişten sonra iki işlem sunar: **Yazılı Soru Önergesi İncelemesi** ve **Gelen Kağıt İşlemleri**. Önerge incelemesinde tekli/toplu PDF kontrolü ve **EBYS–KKBS karşılaştırması** bulunur. Gelen Kağıt İşlemleri, Excel veya yapıştırılan tablo üzerinden cevaplanmamış önerge aralıklarını ve muhatapları hesaplar.
 
 ## Streamlit ile özel kullanım
 
@@ -27,6 +27,20 @@ uv run --frozen streamlit run streamlit_app.py --server.address 127.0.0.1
 ```
 
 Mevcut uygulama: https://denetim-yazilisoru.streamlit.app/. GitHub dalına gönderilen güncellemenin Streamlit tarafından alınması gerekir. Açılış ekranındaki sürüm bilgisi yeni yayını ayırt etmek içindir; gerektiğinde Streamlit yönetiminden Reboot yapılır.
+
+## EBYS–KKBS giriş karşılaştırması
+
+**Yazılı Soru Önergesi İncelemesi → EBYS–KKBS karşılaştırması** yolundan, KKBS ve EBYS raporlarını ayrı çalışma sayfalarında içeren **tek .xlsx** dosyası yüklenir. API anahtarı gerekmez ve API kredisi tüketilmez. Dosya sınırı 12 MB, sayfa başına kayıt sınırı 100.000'dir.
+
+- KKBS ve EBYS sayfaları seçilebilir. Başlık satırı ve ortak evrak numarası, milletvekili, bakanlık sütunları otomatik tanınır; **Sayfa ve sütunları kontrol et** bölümünde değiştirilebilir. İlk üç kaynak kayıt önizlenir. Aynı konu/özet sütununda hem vekil hem bakanlık varsa iki alan da o sütuna bağlanabilir. Örneğin `İstanbul Milletvekili Çiçek Otlu'nun, ... ilişkin Çevre Bakanı'ndan yazılı soru önergesi` ayrıştırılır. Esas numarası isteğe bağlıdır ve sonuçlarda gösterilir.
+- Kayıtlar yalnızca **ortak evrak numarasıyla** birebir eşleştirilir. Satır sırası veya kişi adına göre tahmini eşleştirme yapılmaz. Yıl/ön ek korunur: `2026/123` ile `123` birleştirilmez. Tekrarlanan, eksik veya diğer sayfada bulunmayan numaralar ayrı kontrol bulgusudur. Açıklaması boş kayıtlar da karşılaştırılır.
+- Türkçe büyük/küçük harf ve aksan farkları normalleştirilir. **Çiçek Otlu / Cengiz Çiçek** farklı kişidir. Tek harflik yazım farkları yalnızca kaynaklarda tek yakın tam ad bulunduğunda uyumlu sayılır ve ayrı açılır listede açıklanır. İki farklı bilinen kişi adı yazım hatası bahanesiyle birleştirilmez. Eksik veya ayrıştırılamayan adlar kontrol listesine alınır.
+- Bakanın tam adının bulunması zorunlu değildir: **Çevre Bakanı** ile **Çevre, Şehircilik ve İklim Değişikliği Bakanı Murat Kurum** aynı kurumdur; **Adalet Bakanı** farklıdır. Sadece bakan adı varsa kullanıcıya ait `rules.json` listesindeki tam adla eşleştirme denenir. Bakanlık açıkça yazılıysa o kurum esas alınır. Bu işlem güncel bakan kişisini doğrulamaz ve internetten yeni liste almaz.
+- Uyuşmazlıklar ana sonuçta kırmızı bildirimle; kaynaklardaki değerleri, evrak/esas numaraları, Excel satırları ve açıklamalarıyla gösterilir. Eksik/şüpheli bilgiler **Kontrol gerekli** altında, kabul edilen küçük yazım farkları başka bir açılır listede bulunur. İki alandaki sorunlar aynı evrakı uyuşmazlık sayacında iki kez saydırmaz. Eşleşme yoksa veya belirsizlik varsa tüm kayıtlar uygun gösterilmez.
+- CSV ve JSON bütün bulguları içerir; ekrandaki tablolar ilk 500 bulguyu gösterir. JSON ayrıca kaynak dosyanın SHA-256 değerini, sayfa/sütun seçimlerini (sütun indeksleri sıfırdan başlar), karşılaştırma ve referans sürümlerini içerir. CSV'de formül olarak yorumlanabilecek hücreler etkisizleştirilir.
+- Dosya, sayfa, sütun veya başlık değiştiğinde önceki sonuç kaldırılır. Veriler oturum belleğinde tutulur; ortak önbelleğe/diske yazılmaz ve çıkışta temizlenir. Kesilen Excel okuması yeniden denenir. İki sistemde aynı yanlış bilgi varsa bu karşılaştırma onu tespit edemez; uyuşmazlığın hangi tarafta olduğunu belirlemek için önergenin aslı kullanılır.
+
+Doğrulama: gerçek KKBS `(55).xlsx` dosyasındaki 106 kayıt, açıkça yapay olarak oluşturulan EBYS karşılığıyla okuma/eşleştirme testinden geçirildi. Referans sohbetin gerçek EBYS eki erişilebilir olmadığından o dosyanın sütun biçimi ayrıca doğrulanamadı. Otomatik testler farklı kişiler/bakanlıklar, kısa unvanlar, yazım farkları, boş açıklamalar, karışık satır sırası, eksik/tekrar numaralar ve oturum değişikliklerini kapsar.
 
 ## FastAPI geliştirme sunucusunu çalıştırma
 

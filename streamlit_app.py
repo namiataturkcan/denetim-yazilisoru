@@ -14,9 +14,10 @@ import streamlit as st
 from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError
 
-from app import ANALYSIS_VERSION, RELEASE, MAX_BYTES, RULES, analyze, finalize, prepare_pdf
+from app import ANALYSIS_VERSION, RELEASE, MAX_BYTES, RULES, MEMBER_REFERENCE, analyze, finalize, prepare_pdf
 from incoming_ui import render_incoming
 from bulk_ui import pause_bulk_job, render_bulk
+from entry_comparison_ui import render_entry_comparison
 
 
 def setting(name, default=""):
@@ -42,7 +43,7 @@ def main():
     section = st.session_state.get("active_module")
     titles = {"review": "Yazılı Soru Önergesi İncelemesi", "incoming": "Gelen Kağıt İşlemleri"}
     title = titles.get(section, "Yazılı Soru İşlemleri")
-    subtitle = {"review": "Belgeyi inceleyin, bulguları kaynağı üzerinde görün, raporu indirin.",
+    subtitle = {"review": "Önergeleri inceleyin veya EBYS ile KKBS girişlerini karşılaştırın.",
                 "incoming": "Cevaplanmamış önergeleri, esas numarası aralıklarını ve muhatapları listeleyin."}.get(section, "Yapmak istediğiniz işlemi seçin.")
     st.set_page_config(page_title=title, page_icon="📄", layout="wide")
     st.markdown("<style>" + Path(__file__).with_name("streamlit_style.css").read_text() + "</style>", unsafe_allow_html=True)
@@ -90,7 +91,7 @@ def select_module(name):
 def render_home():
     left, right = st.columns(2, gap="large")
     with left:
-        st.markdown('<div class="module-card"><div class="module-number">01 · BELGE İNCELEMESİ</div><h2>Yazılı Soru Önergesi İncelemesi</h2><p>Önerge PDF’sini yükleyin. Şekil kontrollerini, bakan ve seçim çevresi eşleşmelerini inceleyin; hataları belge üzerinde görün.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="module-card"><div class="module-number">01 · BELGE İNCELEMESİ</div><h2>Yazılı Soru Önergesi İncelemesi</h2><p>Tekli veya toplu önerge incelemesi yapın. EBYS–KKBS karşılaştırması ile iki rapordaki milletvekili ve bakanlık girişlerini kontrol edin.</p></div>', unsafe_allow_html=True)
         st.button("Önerge incelemesine geç", type="primary", width="stretch", on_click=select_module, args=("review",))
     with right:
         st.markdown('<div class="module-card"><div class="module-number">02 · LİSTE İŞLEMLERİ</div><h2>Gelen Kağıt İşlemleri</h2><p>Memur işlemi veya uzman kontrolünü seçin. Excel’den ilan edilecek ya da ilan edilmiş önerge numaralarını ve bakanlıkları listeleyin.</p></div>', unsafe_allow_html=True)
@@ -100,8 +101,11 @@ def render_home():
 def render_review():
     key = setting("ONERGE_DIRECT_API_KEY") or setting("ONERGE_API_KEY") or setting("OPENAI_API_KEY")
     job = st.session_state.get('bulk_job')
-    mode = st.radio('İnceleme türü', ['Tekli inceleme', 'Toplu inceleme'], horizontal=True,
+    mode = st.radio('İnceleme türü', ['Tekli inceleme', 'Toplu inceleme', 'EBYS–KKBS karşılaştırması'], horizontal=True,
                     key='review_mode', disabled=job is not None and job.running)
+    if mode == 'EBYS–KKBS karşılaştırması':
+        render_entry_comparison(RULES['recipients'], MEMBER_REFERENCE['members'])
+        return
     if mode == 'Toplu inceleme':
         render_bulk(key, setting('ONERGE_MODEL', 'gpt-4.1'),
                     lambda: bool(setting('APP_PASSWORD')) and st.session_state.get('authenticated')
