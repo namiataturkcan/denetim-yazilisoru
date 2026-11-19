@@ -74,11 +74,13 @@ def test_sheet_change_clears_old_result_and_same_sheets_are_rejected(monkeypatch
 def test_interrupted_reader_and_missing_cached_data_are_retried(monkeypatch):
     from entry_comparison import read_sheets
     calls = []
-    def interrupted(*args):
+    def interrupted(*args, **kwargs):
+        if kwargs.get('preview'):
+            return read_sheets(*args, **kwargs)
         calls.append(1)
         if len(calls) == 1:
             st.rerun()
-        return read_sheets(*args)
+        return read_sheets(*args, **kwargs)
     at = setup(monkeypatch)
     with patch('streamlit.file_uploader', return_value=Upload()), patch('entry_comparison_ui.read_sheets', side_effect=interrupted):
         at.run()

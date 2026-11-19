@@ -5,6 +5,7 @@ import io
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from itertools import islice
 from pathlib import Path
 
 from incoming_papers import MAX_COLUMNS, MAX_ROWS, TableError, _workbook, key
@@ -75,17 +76,17 @@ def member_name(value):
     if not value or len(value) > 20000:
         return ''
     value = re.sub(r'\([^()]*(?:Milletvekili|Mv\.)[^()]*\)', '', value, flags=re.I).strip()
-    role = re.search(r'\b(?:Milletvekili|Mv\.)\s+', value, re.I)
+    role = re.search(r'\b(?:Milletvekili|Mv\.?)\s+', value, re.I)
     if role:
         if role.start() > 60:
             return ''  # Do not search the question narrative for an owner.
         value = value[role.end():]
-    value = re.sub(r'^(?:(?:Sayın|Sn\.?|Prof\.?|Doç\.?|Dr\.?)\s+)+', '', value, flags=re.I)
+    value = re.sub(r'^(?:(?:Sayın|Sn\.?|Prof\.?|Doç\.?|Dr\.?|Grup Başkanvekili)\s+)+', '', value, flags=re.I)
     value = re.split(r"['’‘ʼ]", value, maxsplit=1)[0].strip()
     value = value.replace(',', ' ')
     words = value.split()
     if (not 2 <= len(words) <= 5 or len(value) > 120
-            or not all(re.fullmatch(r'[^\W\d_]+(?:-[^\W\d_]+)?', word) for word in words)):
+            or not all(re.fullmatch(r'[^\W\d_]+(?:-[^\W\d_]+)?|[^\W\d_]\.', word) for word in words)):
         return ''
     if set(folded(value).split()) & {'milletvekili', 'bakani', 'bakanligi', 'bakan', 'onergesi',
                                     'yazili', 'iliskin', 'hakkinda', 'konulu', 'tarafindan', 'tbmm'}:
@@ -108,12 +109,47 @@ def one_edit(a, b):
     return a[i:] == b[i+1:]
 
 
-def compare_members(left, right, known):
+def within_two_edits(a, b):
+    if abs(len(a)-len(b)) > 2:
+        return False
+    previous = list(range(len(b)+1))
+    for i, char in enumerate(a, 1):
+        current = [i]
+        for j, other in enumerate(b, 1):
+            current.append(min(current[-1]+1, previous[j]+1, previous[j-1]+(char != other)))
+        if min(current) > 2:
+            return False
+        previous = current
+    return previous[-1] <= 2
+
+
+def resolve_initials(parts, full_names):
+    if not any(len(p) == 1 for p in parts):
+        return ' '.join(parts)
+    if len(parts[-1]) == 1:
+        return None  # A surname initial is not enough to identify an owner.
+    matches = set()
+    for name in full_names:
+        words = folded(name).split()
+        if len(words) == len(parts) and all(len(w) > 1 for w in words) and all(
+                w == p or (len(p) == 1 and w.startswith(p)) for w, p in zip(words, parts)):
+            matches.add(' '.join(words))
+    return next(iter(matches)) if len(matches) == 1 else None
+
+
+def compare_members(left, right, known, full_names=()):
     a, b = member_name(left), member_name(right)
     if not a or not b:
         return 'belirsiz', 'Milletvekili adı boş, eksik veya seçilen metinden açıkça ayrıştırılamadı.'
     fa, fb = folded(a), folded(b)
     ca, cb = fa.replace(' ', ''), fb.replace(' ', '')
+    if any(len(p) == 1 for p in (fa+' '+fb).split()):
+        ra, rb = (resolve_initials(name.split(), full_names) for name in (fa, fb))
+        if not ra or not rb:
+            return 'belirsiz', 'Kısaltılmış milletvekili adı kaynaklarda tek bir tam adla eşleştirilemedi.'
+        if ra == rb:
+            return 'yazim', 'Adın baş harfiyle yapılan kısaltma, kaynaklarda tek bir tam adla eşleşti.'
+        return 'uyari', 'Kısaltılmış ad açıldığında milletvekili adları farklı kişilere karşılık geliyor.'
     if ca == cb:
         return 'uygun', ''
     # Never excuse two known, different people as a spelling mistake.
@@ -126,6 +162,16 @@ def compare_members(left, right, known):
         if possibilities == {ca}:
             return 'yazim', 'Tek harf veya harf sırası farkı var; kaynaklardaki tek yakın tam adla uyumlu.'
         return 'belirsiz', 'Adlar yakın yazılmış ancak farklı kişileri belirtme ihtimali dışlanamadı.'
+    # Longer names can contain a short extra/missing syllable in one word.
+    # Keep the other words exact and require a single candidate in the user's
+    # reference + KKBS source, never a generic fuzzy match to arbitrary people.
+    wa, wb = fa.split(), fb.split()
+    if (min(len(ca), len(cb)) >= 12 and len(wa) == len(wb)
+            and sum(a != b for a, b in zip(wa, wb)) == 1 and within_two_edits(ca, cb)):
+        possibilities = {name for name in known if within_two_edits(name, cb)}
+        if possibilities == {ca}:
+            return 'yazim', 'Adın bir sözcüğünde iki harfe kadar yazım farkı var; diğer sözcükler aynı ve kaynaklarda tek yakın tam ad bulundu.'
+        return 'belirsiz', 'Adlar yakın yazılmış; hangi kişiyi belirttiği kaynaklardan kesinleştirilemedi.'
     return 'uyari', 'Milletvekili adları uyuşmuyor; ortak bir ad/soyad sözcüğü aynı kişi kabul edilmez.'
 
 
@@ -133,6 +179,11 @@ def ministry_identity(value, recipients):
     value = folded(value)
     if not value or len(value) > 20000:
         return None, False
+    # In KKBS summaries the subject can mention another minister. The office
+    # after "ilişkin" is the addressee; never fall back to a subject mention if
+    # that addressee is unknown or missing.
+    if ' iliskin ' in value and re.search(r'\byazili soru\b', value.rsplit(' iliskin ', 1)[1]):
+        value = value.rsplit(' iliskin ', 1)[1]
     found = set()
     for title, aliases in MINISTRIES.items():
         for alias in aliases:
@@ -169,7 +220,70 @@ class Sheet:
     rows: list
 
     def headers(self, row_number):
+        if row_number == 0:
+            width = max((len(values) for _, values in self.rows), default=0)
+            return tuple('' for _ in range(width))
         return next((values for number, values in self.rows if number == row_number), ())
+
+
+def is_ebys_subject(value):
+    """Recognize incoming-register subjects, not copied KKBS owner summaries."""
+    return bool(re.match(r'^yazili soru\b.{0,90}\b(?:mv|milletvekili)\b', folded(value)))
+
+
+def ebys_subject_columns(sheet):
+    samples = [values for _, values in sheet.rows[:30]]
+    width = max((len(values) for values in samples), default=0)
+    columns = []
+    for index in range(width):
+        filled = [values[index] for values in samples if index < len(values) and text(values[index])]
+        # A title/header or occasional empty cell must not defeat recognition.
+        count = sum(is_ebys_subject(v) for v in filled)
+        if count and count >= max(1, len(filled) * .6):
+            columns.append(index)
+    return columns
+
+
+def suggest_mapping(sheet, header_row):
+    if header_row:
+        return suggest_columns(sheet.headers(header_row))
+    result = {field: None for field in ALIASES}
+    subjects = ebys_subject_columns(sheet)
+    if len(subjects) != 1:
+        return result
+    subject = subjects[0]
+    result.update(member=subject, ministry=subject)
+    samples = [values for _, values in sheet.rows[:30]
+               if subject < len(values) and is_ebys_subject(values[subject])]
+    candidates = []
+    for index in range(len(sheet.headers(0))):
+        ids = [document_id(values[index]) if index < len(values) else '' for values in samples]
+        if all(ids) and all(identity != '0' for identity in ids):
+            candidates.append((index, ids))
+    # Repeated ID columns are common in joined exports. Only pick one when
+    # all candidates contain the very same IDs; otherwise ask for a mapping.
+    if candidates and all(ids == candidates[0][1] for _, ids in candidates):
+        result['document'] = candidates[0][0]
+    return result
+
+
+def validate_ebys_source(sheet, header_row, mapping):
+    subjects = ebys_subject_columns(sheet)
+    if len(subjects) != 1:
+        return
+    subject = subjects[0]
+    if any(number <= header_row and subject < len(values) and is_ebys_subject(values[subject])
+           for number, values in sheet.rows):
+        raise TableError('EBYS başlık satırı seçimi gerçek kayıtları atlıyor. Başlıksız sayfada başlık satırını 0 yapın.')
+    headers = sheet.headers(header_row)
+    def explicit_field(field):
+        index = mapping.get(field)
+        return (header_row > 0 and index is not None and index < len(headers)
+                and key(headers[index]) in {key(alias) for alias in ALIASES[field]})
+    if any(mapping.get(field) != subject and not explicit_field(field) for field in ('member', 'ministry')):
+        from openpyxl.utils import get_column_letter
+        raise TableError(f'EBYS gelen evrak metni {get_column_letter(subject+1)} sütununda bulundu. '
+                         'Milletvekili ve bakanlık alanlarında bu sütunu seçin; diğer sayfadan kopyalanmış özetle karşılaştırma yapılmamalı.')
 
 
 def suggest_columns(headers):
@@ -186,12 +300,28 @@ def suggest_columns(headers):
 
 def suggest_header(sheet):
     candidates = [(number, suggest_columns(values)) for number, values in sheet.rows if number <= 30]
-    return max(candidates, key=lambda item: sum(item[1][f] is not None for f in ('document', 'member', 'ministry')))[0] if candidates else 1
+    best = max(candidates, key=lambda item: sum(item[1][f] is not None for f in ('document', 'member', 'ministry')), default=None)
+    if best and any(v is not None for v in best[1].values()):
+        return best[0]
+    return 0 if ebys_subject_columns(sheet) else 1
 
 
-def read_sheets(data, names):
-    if len(names) != 2 or len(set(names)) != 2:
-        raise TableError('KKBS ve EBYS için iki farklı çalışma sayfası seçin.')
+def suggest_sheet_pair(previews):
+    def kkbs_score(sheet):
+        mapping = suggest_mapping(sheet, suggest_header(sheet))
+        return ('kkbs' in key(sheet.name), not bool(ebys_subject_columns(sheet)),
+                sum(v is not None for v in mapping.values()))
+    kkbs = max(previews, key=kkbs_score)
+    remaining = [s for s in previews if s.name != kkbs.name]
+    ebys = max(remaining, key=lambda s: (bool(ebys_subject_columns(s)),
+               any(v in key(s.name) for v in ('ebys', 'gelenevrak')),
+               sum(v is not None for v in suggest_mapping(s, suggest_header(s)).values())))
+    return kkbs.name, ebys.name
+
+
+def read_sheets(data, names, *, preview=False):
+    if len(names) < 2 or len(set(names)) != len(names):
+        raise TableError('KKBS ve EBYS için farklı çalışma sayfaları seçin.')
     book = _workbook(data)
     try:
         sheets = []
@@ -201,7 +331,8 @@ def read_sheets(data, names):
             ws = book[name]
             ws.reset_dimensions()
             rows = []
-            for number, raw in enumerate(ws.iter_rows(values_only=True), 1):
+            source = ws.iter_rows(values_only=True)
+            for number, raw in enumerate(islice(source, 30) if preview else source, 1):
                 if number > MAX_ROWS + 30:
                     raise TableError('Her sayfada en fazla 100.000 veri satırı destekleniyor.')
                 values = list(raw)
@@ -257,8 +388,8 @@ def finding(status, field, reason, left=None, right=None):
 
 
 def compare_records(kkbs, ebys, recipients, reference_names=()):
-    known = {folded(name).replace(' ', '') for name in reference_names}
-    known.update(folded(member_name(r['member'])).replace(' ', '') for r in kkbs if member_name(r['member']))
+    full_names = set(reference_names) | {member_name(r['member']) for r in kkbs if member_name(r['member'])}
+    known = {folded(name).replace(' ', '') for name in full_names}
     groups = [defaultdict(list), defaultdict(list)]
     issues, variants = [], []
     for rows, group, side in zip((kkbs, ebys), groups, ('kkbs', 'ebys')):
@@ -285,7 +416,7 @@ def compare_records(kkbs, ebys, recipients, reference_names=()):
         matched += 1
         name_key = (left['member'], right['member'])
         if name_key not in name_cache:
-            name_cache[name_key] = compare_members(*name_key, known)
+            name_cache[name_key] = compare_members(*name_key, known, full_names)
         name_status, explanation = name_cache[name_key]
         checks = [('member', name_status, explanation)]
         offices = []

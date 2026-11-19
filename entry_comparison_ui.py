@@ -6,8 +6,9 @@ import streamlit as st
 from openpyxl.utils import get_column_letter
 
 from entry_comparison import (VERSION, compare_records, issue_rows, read_sheets,
-                              records, report_csv, suggest_columns, suggest_header, text)
-from incoming_papers import MAX_TABLE_BYTES, TableError, key, sheet_names
+                              records, report_csv, suggest_mapping, suggest_header,
+                              suggest_sheet_pair, text, validate_ebys_source)
+from incoming_papers import MAX_TABLE_BYTES, TableError, sheet_names
 
 
 def digest(value):
@@ -30,10 +31,11 @@ def reset_source(source):
 def column_controls(sheet, side, source_key):
     st.markdown(f'**{side} sütunları**')
     prefix = f'entry_{side}_{source_key}'
-    header = int(st.number_input(f'{side} başlık satırı', min_value=1, max_value=30,
-                                value=suggest_header(sheet), step=1, key=prefix+'_header'))
+    header = int(st.number_input(f'{side} başlık satırı', min_value=0, max_value=30,
+                                value=suggest_header(sheet), step=1, key=prefix+'_header',
+                                help='Başlık yoksa 0 seçin; ilk satır da kayıt olarak okunur.'))
     headers = sheet.headers(header)
-    guessed = suggest_columns(headers)
+    guessed = suggest_mapping(sheet, header)
     options = [None, *range(len(headers))]
     mapping = {}
     labels = {'document': 'Ortak evrak numarası', 'member': 'Milletvekili adı / sahibi',
@@ -123,10 +125,14 @@ def render_entry_comparison(recipients, reference_names):
         names = sheet_names(data)
         if len(names) < 2:
             raise TableError('Dosyada en az iki çalışma sayfası olmalı: biri KKBS, diğeri EBYS / gelen evrak raporu.')
+        profile_key = digest([source, VERSION])
+        if st.session_state.get('entry_profile_key') != profile_key or not st.session_state.get('entry_profiles'):
+            clear_results()
+            profiles = read_sheets(data, names, preview=True)
+            st.session_state['entry_profiles'] = profiles
+            st.session_state['entry_profile_key'] = profile_key
         left, right = st.columns(2)
-        default_kkbs = next((n for n in names if 'kkbs' in key(n)), names[0])
-        default_ebys = next((n for n in names if n != default_kkbs and any(v in key(n) for v in ('ebys', 'gelenevrak'))),
-                            next(n for n in names if n != default_kkbs))
+        default_kkbs, default_ebys = suggest_sheet_pair(st.session_state['entry_profiles'])
         kkbs_name = left.selectbox('KKBS çalışma sayfası', names, index=names.index(default_kkbs), key='entry_kkbs_sheet')
         ebys_name = right.selectbox('EBYS çalışma sayfası', names, index=names.index(default_ebys), key='entry_ebys_sheet')
         source_key = digest([source, kkbs_name, ebys_name, VERSION])
@@ -136,7 +142,7 @@ def render_entry_comparison(recipients, reference_names):
             st.session_state['entry_sheets'] = sheets
             st.session_state['entry_loaded_key'] = source_key  # Mark loaded only after a complete read.
         sheets = st.session_state['entry_sheets']
-        guesses = [suggest_columns(sheet.headers(suggest_header(sheet))) for sheet in sheets]
+        guesses = [suggest_mapping(sheet, suggest_header(sheet)) for sheet in sheets]
         missing = any(g[f] is None for g in guesses for f in ('document', 'member', 'ministry'))
         with st.expander('Sayfa ve sütunları kontrol et', expanded=missing):
             st.caption('Evrak numarası iki raporda da aynı kayıt numarası olmalı. Ad ve bakanlık aynı konu/özet sütunundaysa '
@@ -146,6 +152,12 @@ def render_entry_comparison(recipients, reference_names):
                 kkbs_header, kkbs_mapping = column_controls(sheets[0], 'KKBS', source_key)
             with right:
                 ebys_header, ebys_mapping = column_controls(sheets[1], 'EBYS', source_key)
+        for side, name, header, mapping in (('KKBS', kkbs_name, kkbs_header, kkbs_mapping),
+                                            ('EBYS', ebys_name, ebys_header, ebys_mapping)):
+            selected = ' · '.join(label + ': ' + (get_column_letter(mapping[field]+1) if mapping[field] is not None else 'seçilmedi')
+                                  for field, label in (('document', 'Evrak'), ('member', 'Milletvekili'), ('ministry', 'Bakanlık')))
+            st.caption(f'{side} / {name} · {selected} · ' + ('Başlık yok; ilk satır dahil' if header == 0 else f'Başlık: {header}. satır'))
+        validate_ebys_source(sheets[1], ebys_header, ebys_mapping)
         config = {'document_sha256': source, 'version': VERSION,
                   'reference_sha256': digest([recipients, sorted(reference_names)]),
                   'kkbs': {'sheet': kkbs_name, 'header_row': kkbs_header, 'columns': kkbs_mapping},
