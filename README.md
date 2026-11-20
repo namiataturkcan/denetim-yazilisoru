@@ -28,6 +28,14 @@ uv run --frozen streamlit run streamlit_app.py --server.address 127.0.0.1
 
 Mevcut uygulama: https://denetim-yazilisoru.streamlit.app/. GitHub dalına gönderilen güncellemenin Streamlit tarafından alınması gerekir. Açılış ekranındaki sürüm bilgisi yeni yayını ayırt etmek içindir; gerektiğinde Streamlit yönetiminden Reboot yapılır.
 
+### Arayüz sürümü ve görünüm
+
+Arayüz sürümü `ui_theme.py` içindeki `UI_RELEASE` ile gösterilir. Analiz/karşılaştırma sürümlerinden ayrıdır: yalnız görsel bir güncelleme tamamlanmış incelemeyi geçersiz kılmaz ve yeniden ücretli analiz istemez. Kural veya kaynak değişikliklerinin mevcut doğrulama mekanizması devam eder.
+
+Giriş, ana menü ve üç işlem alanı aynı renk, yazı, düğme, yükleme ve sonuç kutusu düzenini kullanır. Yeşil/kırmızı/sarı/gri anlamları korunur; sayı ve açıklamalar renge ek olarak gösterilir. Küçük ekranlarda menü kartları alt alta, sonuç sayaçları ikili düzende görünür; tablolar kendi yatay kaydırma alanını kullanır. Klavye odağı belirgindir ve azaltılmış hareket tercihi desteklenir.
+
+Görsel katman harici yazı tipi, ikon servisi veya ek JavaScript bağımlılığı yüklemez. Statik CSS dosyası değişiklik zamanına göre küçük bir önbellekten okunur; bu önbellekte belge veya kullanıcı verisi tutulmaz. Yükleme alanlarının sınırları, işlem düğmeleri, rapor içerikleri ve oturumdaki sorgu listeleri görsel katmandan bağımsızdır.
+
 ## İkinci Okuyucu İşlemleri · EBYS–KKBS giriş karşılaştırması
 
 Ana menüden **İkinci Okuyucu İşlemleri** seçilir. Aynı yükleme alanı dosya sayısına göre iki akışı destekler; ayrıca işlem türü seçmek gerekmez. API anahtarı gerekmez ve API kredisi tüketilmez. Her dosyanın sınırı 12 MB, sayfa başına kayıt sınırı 100.000'dir.

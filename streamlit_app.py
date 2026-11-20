@@ -6,7 +6,6 @@ import hmac
 import json
 import os
 import html
-from pathlib import Path
 
 from annotations import annotate_pdf, marked_text
 
@@ -18,6 +17,7 @@ from app import ANALYSIS_VERSION, RELEASE, MAX_BYTES, RULES, MEMBER_REFERENCE, a
 from incoming_ui import render_incoming
 from bulk_ui import pause_bulk_job, render_bulk
 from entry_comparison_ui import render_entry_comparison
+from ui_theme import module_card, page_header, stylesheet
 
 
 def setting(name, default=""):
@@ -53,9 +53,8 @@ def main():
                 "second_reader": "Okuma öncesinde veya sonrasında KKBS ve EBYS girişlerini karşılaştırın.",
                 "incoming": "Cevaplanmamış önergeleri, esas numarası aralıklarını ve muhatapları listeleyin."}.get(section, "Yapmak istediğiniz işlemi seçin.")
     st.set_page_config(page_title=title, page_icon="📄", layout="wide")
-    st.markdown("<style>" + Path(__file__).with_name("streamlit_style.css").read_text() + "</style>", unsafe_allow_html=True)
-    st.markdown(f'<div class="hero"><h1>{title}</h1><p>{subtitle}</p></div>', unsafe_allow_html=True)
-    st.caption(f"Sürüm: {RELEASE}")
+    st.markdown("<style>" + stylesheet() + "</style>", unsafe_allow_html=True)
+    st.markdown(page_header(title, subtitle), unsafe_allow_html=True)
     password = setting("APP_PASSWORD")
     if not password:
         st.error("Uygulama erişim parolası henüz yapılandırılmadı.")
@@ -64,9 +63,11 @@ def main():
     fingerprint = hashlib.sha256(password.encode()).hexdigest()
     if st.session_state.get("authenticated") != fingerprint:
         pause_bulk_job()
-        with st.form("login"):
-            entered = st.text_input("Erişim parolası", type="password")
-            submitted = st.form_submit_button("Giriş yap")
+        with st.container(key='login_panel'):
+            st.markdown('<div class="login-heading"><h2>Çalışma alanına giriş</h2><p>Devam etmek için erişim parolanızı girin.</p></div>', unsafe_allow_html=True)
+            with st.form("login"):
+                entered = st.text_input("Erişim parolası", type="password")
+                submitted = st.form_submit_button("Giriş yap", type='primary', width='stretch')
         if submitted:
             if hmac.compare_digest(entered.encode(), password.encode()):
                 st.session_state["authenticated"] = fingerprint
@@ -74,17 +75,20 @@ def main():
             else:
                 st.error("Parola doğru değil.")
         st.stop()
-    if st.button("Çıkış yap", type="tertiary"):
-        pause_bulk_job()
-        st.session_state.clear()
-        st.rerun()
+    with st.container(key='app_navigation'):
+        back, account = st.columns([3, 1])
+        if account.button("Çıkış yap", type="tertiary", width='stretch'):
+            pause_bulk_job()
+            st.session_state.clear()
+            st.rerun()
+        if section in titles:
+            if back.button("← İşlem seçimine dön", type="tertiary"):
+                pause_bulk_job()
+                st.session_state.pop("active_module", None)
+                st.rerun()
     if section not in titles:
         render_home()
         return
-    if st.button("← İşlem seçimine dön", type="tertiary"):
-        pause_bulk_job()
-        st.session_state.pop("active_module", None)
-        st.rerun()
     if section == "incoming":
         render_incoming(RULES["recipients"])
         return
@@ -100,14 +104,20 @@ def select_module(name):
 
 def render_home():
     left, middle, right = st.columns(3, gap="large")
-    with left:
-        st.markdown('<div class="module-card"><div class="module-number">01 · BELGE İNCELEMESİ</div><h2>Yazılı Soru Önergesi İncelemesi</h2><p>Tekli veya toplu önerge incelemesi yapın. Şekil kontrollerini ve önerge ile KKBS bilgilerinin uyumunu inceleyin.</p></div>', unsafe_allow_html=True)
+    with left, st.container(key='home_review'):
+        st.markdown(module_card('review', '01', 'BELGE İNCELEMESİ', 'Yazılı Soru Önergesi İncelemesi',
+                    'Önergelerin şekil koşullarını inceleyin. Tekli belgelerde hataları görün; toplu taramaları KKBS ile karşılaştırın.',
+                    ['Tekli / Toplu', 'PDF + KKBS']), unsafe_allow_html=True)
         st.button("Önerge incelemesine geç", type="primary", width="stretch", on_click=select_module, args=("review",))
-    with middle:
-        st.markdown('<div class="module-card"><div class="module-number">02 · LİSTE İŞLEMLERİ</div><h2>Gelen Kağıt İşlemleri</h2><p>Memur işlemi veya uzman kontrolünü seçin. Excel’den ilan edilecek ya da ilan edilmiş önerge numaralarını ve bakanlıkları listeleyin.</p></div>', unsafe_allow_html=True)
+    with middle, st.container(key='home_incoming'):
+        st.markdown(module_card('incoming', '02', 'LİSTE İŞLEMLERİ', 'Gelen Kağıt İşlemleri',
+                    'İlan edilecek veya ilan edilmiş önerge aralıklarını oluşturun. Muhatapları görün, sorguları birleşik listeye ekleyin.',
+                    ['Memur / Uzman', 'Excel / Tablo']), unsafe_allow_html=True)
         st.button("Gelen kağıt işlemlerine geç", type="primary", width="stretch", on_click=select_module, args=("incoming",))
-    with right:
-        st.markdown('<div class="module-card"><div class="module-number">03 · GİRİŞ KARŞILAŞTIRMASI</div><h2>İkinci Okuyucu İşlemleri</h2><p>Okuma öncesinde ayrı KKBS ve EBYS dosyalarını, okuma sonrasında birleşik Excel’i yükleyin. Milletvekili ve bakanlık girişlerini karşılaştırın.</p></div>', unsafe_allow_html=True)
+    with right, st.container(key='home_reader'):
+        st.markdown(module_card('reader', '03', 'GİRİŞ KARŞILAŞTIRMASI', 'İkinci Okuyucu İşlemleri',
+                    'KKBS ve EBYS kayıtlarını karşılaştırın. Okuma öncesinde ayrı dosyaları, okuma sonrasında birleşik Excel’i yükleyin.',
+                    ['Öncesi / Sonrası', '1 veya 2 Excel']), unsafe_allow_html=True)
         st.button("İkinci okuyucu işlemlerine geç", type="primary", width="stretch", on_click=select_module, args=("second_reader",))
 
 

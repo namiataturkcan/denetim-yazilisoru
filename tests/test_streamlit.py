@@ -49,7 +49,9 @@ def test_upload_analysis_and_clear(monkeypatch):
     class Upload:
         def getvalue(self):
             return data
+    calls = []
     async def mock_analyze(pages, *, credential, model):
+        calls.append(1)
         assert credential == 'test-api-only'
         assert len(pages) == 1
         result = report()
@@ -71,6 +73,14 @@ def test_upload_analysis_and_clear(monkeypatch):
         assert 'check-card uyari' in rendered
         assert 'check-card uygun' in rendered
         assert '<mark class="issue-text">Reference text 10</mark>' in rendered
+        # A presentation release must preserve a paid review and its markings.
+        saved_version = at.session_state['result']['analysis_version']
+        with patch('ui_theme.UI_RELEASE', 'new-presentation-only'):
+            at.run()
+            assert not at.exception
+            assert at.session_state['result']['analysis_version'] == saved_version
+            assert at.session_state['markings']['locations']
+            assert len(calls) == 1
         at.session_state['result']['analysis_version']='old-version'
         at.run()
         assert 'result' not in at.session_state
@@ -195,6 +205,7 @@ def test_all_green_and_zero_counter_colors():
 
 
 def test_version_is_visible_without_upload_or_api_charge(monkeypatch):
-    from app import RELEASE
+    from ui_theme import UI_RELEASE
     at = configured(monkeypatch).run()
-    assert any(RELEASE in item.value for item in at.caption)
+    assert any(UI_RELEASE in item.value for item in at.markdown)
+    assert not at.get('file_uploader')
