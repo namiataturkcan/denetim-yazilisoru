@@ -103,6 +103,28 @@ button,input,textarea,[role="combobox"] { transition: border-color .15s ease, ba
 .incoming-recipients.missing { background: #edf1f5; color: #596b7d; font-size: .9rem; }
 .incoming-recipients.missing h3 { color: #596b7d; font-size: 1rem; padding: 0; margin: 0; }
 
+/* Desktop second-reader table: document number, then expandable explanation. */
+.stApp table.entry-review-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; margin: 0 0 18px; border: 1px solid var(--line); border-radius: 12px; background: white; overflow-wrap: anywhere; }
+.stApp .entry-review-table th { background: #eef3f7; color: var(--navy); font-size: .9rem; padding: 13px 18px; text-align: left; border: 0; border-bottom: 1px solid var(--line); }
+.stApp .entry-review-table th:first-child { width: 145px; border-top-left-radius: 12px; }
+.stApp .entry-review-table th:last-child { border-top-right-radius: 12px; }
+.stApp .entry-review-table td { vertical-align: top; border: 0; padding: 0; }
+.stApp .entry-review-table tbody tr + tr td { border-top: 1px solid var(--line); }
+.stApp .entry-review-table td.entry-document { padding: 17px 18px; font-size: 1rem; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); user-select: text; }
+.entry-review-details summary { cursor: pointer; padding: 16px 20px; min-height: 56px; color: #244f6a; line-height: 1.65; }
+.entry-review-details summary:hover { background: #f3f7fa; }
+.entry-review-details summary:focus-visible { outline: 3px solid #5795b8; outline-offset: -3px; }
+.entry-review-details[open] summary { background: #f3f7fa; border-bottom: 1px solid var(--line); }
+.entry-explanation + .entry-explanation { display: block; margin-top: 6px; }
+.entry-comparison-pair { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; padding: 18px 20px 22px; }
+.entry-source-box { min-width: 0; border: 1px solid #cddae5; border-radius: 10px; padding: 18px; background: #fff; }
+.stApp .entry-source-box h4 { font-size: .9rem; color: var(--navy); font-weight: 700; padding: 0 0 12px; margin: 0 0 12px; border-bottom: 1px solid var(--line); }
+.stApp .entry-source-box h5 { font-size: .83rem; color: var(--muted); padding: 0; margin: 0 0 8px; }
+.entry-source-box section + section { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
+.stApp .entry-source-text { color: var(--ink); font-size: 1rem; line-height: 1.9; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.entry-changed { background: #ffd9dd; color: #8e2332; border-radius: 3px; padding: 2px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.entry-empty { color: var(--muted); font-style: italic; }
+
 @media(max-width:1000px) {
   .block-container { padding-inline: 1.5rem; }
   :is(.st-key-home_review,.st-key-home_incoming,.st-key-home_reader) { padding: 18px; }

@@ -3,7 +3,7 @@ from functools import lru_cache
 from html import escape
 from pathlib import Path
 
-UI_RELEASE = '2026.11.20.1'
+UI_RELEASE = '2026.11.20.2'
 _STYLE = Path(__file__).with_name('streamlit_style.css')
 
 

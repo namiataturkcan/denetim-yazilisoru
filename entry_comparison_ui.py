@@ -9,6 +9,7 @@ from entry_comparison import (VERSION, compare_records, issue_rows, read_sheets,
                               records, report_csv, suggest_mapping, suggest_header,
                               suggest_sheet, suggest_sheet_pair, sheet_score, text, validate_ebys_source)
 from incoming_papers import MAX_TABLE_BYTES, TableError, sheet_names
+from entry_comparison_view import group_mismatches, mismatch_table
 
 
 def digest(value):
@@ -66,7 +67,7 @@ def show_table(items):
         st.caption('İlk 500 bulgu gösteriliyor; indirilen rapor bütün bulguları içerir.')
 
 
-def render_result(report):
+def render_result(report, recipients):
     st.subheader('Giriş Karşılaştırma Sonucu')
     values = (('Eşleşen evrak', report['matched'], 'neutral'),
               ('Uyumlu', report['clean']+report['spelling'], 'uygun'),
@@ -86,7 +87,11 @@ def render_result(report):
                    f"EBYS satırı: {report['unmatched_ebys']}. Kontrol listesindeki kayıtları inceleyin.")
     if red:
         st.error(f"{report['different']} evrakta milletvekili veya bakanlık uyuşmazlığı bulundu. Hangi girişin doğru olduğunu önergenin aslından kontrol edin.")
-        show_table(red)
+        groups = group_mismatches(red)
+        st.caption("Açıklamaya tıklayarak iki kaydın tam metnini açın. Kırmızı zemin, metinler arasındaki farkları gösterir.")
+        st.markdown(mismatch_table(groups[:500], recipients), unsafe_allow_html=True)
+        if len(groups) > 500:
+            st.caption('İlk 500 evrak gösteriliyor; indirilen rapor bütün bulguları içerir.')
     elif report['complete']:
         st.success('Eşleşen bütün kayıtlarda milletvekili ve bakanlık bilgileri uyumlu.')
     elif report['matched']:
@@ -215,7 +220,7 @@ def render_entry_comparison(recipients, reference_names):
                 st.session_state['entry_result_key'] = result_key
         result = st.session_state.get('entry_result')
         if result:
-            render_result(result)
+            render_result(result, recipients)
     except TableError as exc:
         clear_results()
         st.error(str(exc))

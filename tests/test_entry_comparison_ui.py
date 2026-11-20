@@ -39,6 +39,16 @@ def test_route_upload_compare_without_api_and_logout(monkeypatch):
             assert len(at.get('download_button')) == 2
             assert any('1 evrakta' in error.value for error in at.error)
             assert not any('Kontrol gerekli' in x.label for x in at.expander)
+            cards = [x.value for x in at.markdown if '<table class="entry-review-table">' in x.value]
+            assert len(cards) == 1  # Both mismatches belong to the same document.
+            assert 'Milletvekili farklı' in cards[0] and 'Bakanlık farklı' in cards[0]
+            assert 'KKBS: Çiçek Otlu' in cards[0] and 'EBYS: Cengiz Çiçek' in cards[0]
+            assert cards[0].count('<details ') == 1
+            assert 'Esas No' not in cards[0] and 'Excel satırı' not in cards[0] and 'Sonuç' not in cards[0]
+            from copy import deepcopy
+            saved = deepcopy(at.session_state['entry_result'])
+            at.run()
+            assert not at.exception and at.session_state['entry_result'] == saved
             click(at, 'Çıkış yap')
             assert 'entry_result' not in at.session_state and 'entry_sheets' not in at.session_state
 
