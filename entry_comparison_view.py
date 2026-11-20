@@ -83,3 +83,27 @@ def mismatch_table(groups, recipients):
         parts.append('</div></details></td></tr>')
     parts.append('</tbody></table>')
     return ''.join(parts)
+
+
+def writing_suggestions_table(items):
+    parts = ['<table class="entry-review-table entry-writing-table"><thead><tr>'
+             '<th scope="col">Evrak No</th><th scope="col">Olan</th>'
+             '<th scope="col">Olması gereken</th></tr></thead><tbody>']
+    for item in items:
+        original, start, end = item['summary'], item['start'], item['end']
+        # Include context, but do not repeat a whole long summary for each edit.
+        left = max(0, start-55)
+        right = min(len(original), end+55)
+        prefix = ('…' if left else '') + original[left:start]
+        suffix = original[end:right] + ('…' if right < len(original) else '')
+        parts.append(f'<tr><td class="entry-document">{_html(item["document"]) or "Evrak no yok"}</td>')
+        for field in ('before', 'after'):
+            parts.append(f'<td><p class="entry-writing-text">{_html(prefix)}'
+                         f'<mark class="entry-writing-change">{_html(item[field])}</mark>{_html(suffix)}</p>')
+            if field == 'after':
+                conditional = '<b>Bağlama bağlı öneri.</b> ' if item['conditional'] else ''
+                parts.append(f'<p class="entry-writing-reason">{conditional}{_html(item["reason"])}</p>')
+            parts.append('</td>')
+        parts.append('</tr>')
+    parts.append('</tbody></table>')
+    return ''.join(parts)

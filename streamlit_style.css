@@ -124,6 +124,11 @@ button,input,textarea,[role="combobox"] { transition: border-color .15s ease, ba
 .stApp .entry-source-text { color: var(--ink); font-size: 1rem; line-height: 1.9; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .entry-changed { background: #ffd9dd; color: #8e2332; border-radius: 3px; padding: 2px 0; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .entry-empty { color: var(--muted); font-style: italic; }
+.stApp .entry-writing-table th { background: #fff8e6; }
+.stApp .entry-writing-table td:not(.entry-document) { padding: 16px 18px; }
+.stApp .entry-writing-text { white-space: pre-wrap; line-height: 1.8; margin: 0; overflow-wrap: anywhere; }
+.entry-writing-change { background: #ffe5a1; color: #654609; border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; padding-block: 2px; }
+.stApp .entry-writing-reason { color: var(--muted); font-size: .83rem; line-height: 1.6; margin: 10px 0 0; }
 
 @media(max-width:1000px) {
   .block-container { padding-inline: 1.5rem; }

@@ -75,3 +75,17 @@ def test_shared_subject_is_shown_once_per_side_for_two_findings():
     assert html.count('class="entry-source-box"') == 2
     content = ''.join(Parsed(html).content)
     assert content.count(left) == 1 and content.count(right) == 1
+
+
+def test_writing_table_preserves_extra_spaces_and_escapes_uploaded_text():
+    from entry_comparison_view import writing_suggestions_table
+    value = '<img src=x onerror=alert(1)> iki  kelime'
+    start = value.index('  ')
+    finding = dict(document='<script>bad</script>', summary=value, start=start, end=start+2,
+                   before='  ', after=' ', reason='İki boşluk yerine bir boşluk.', conditional=False)
+    html = writing_suggestions_table([finding])
+    parsed = Parsed(html)
+    assert 'script' not in parsed.tags and 'img' not in parsed.tags
+    assert '<mark class="entry-writing-change">  </mark>' in html
+    assert '<mark class="entry-writing-change"> </mark>' in html
+    assert value in ''.join(parsed.content)

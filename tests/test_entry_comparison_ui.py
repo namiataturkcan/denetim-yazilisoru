@@ -111,3 +111,37 @@ def test_no_common_id_is_not_green_and_control_list_is_collapsed(monkeypatch):
         assert any('birebir eşleşen kayıt bulunamadı' in e.value for e in at.error)
         expander = next(e for e in at.expander if e.label.startswith('Kontrol gerekli'))
         assert not expander.proto.expanded
+
+
+def test_writing_check_uses_only_kkbs_summary_and_moves_control_count_to_note(monkeypatch):
+    from copy import deepcopy
+    from test_entry_comparison import HEADERS
+    headers = [*HEADERS[:4], 'Özet']
+    data = workbook(headers=headers,
+        left=[[100, 'Çiçek Otlu', 'Çevre Bakanı', '', "personelin  unvan değişikliğine ve Sayıştay Başkanlığı'na ilişkin"],
+              [102, 'Çiçek Otlu', 'Çevre Bakanı', '', 'haklar  konusunda']],
+        right=[[100, 'Cengiz Çiçek', 'Adalet Bakanı', '', 'herkez yalnış']])
+    at = setup(monkeypatch)
+    with patch('streamlit.file_uploader', return_value=[Upload(data)]), \
+         patch('app.analyze', side_effect=AssertionError('No API allowed')):
+        at.run()
+        assert next(s for s in at.selectbox if s.label == 'KKBS · Denetlenecek özet sütunu').value == 4
+        click(at, 'Girişleri karşılaştır')
+        assert not at.exception
+        result = deepcopy(at.session_state['entry_result'])
+        assert result['different'] == 1 and result['matched'] == 1 and result['unmatched_kkbs'] == 1
+        suggestions = result['summary_review']['suggestions']
+        assert len(suggestions) == 4 and {s['document'] for s in suggestions} == {'100', '102'}
+        assert not any(s['before'] in ('herkez', 'yalnış') for s in suggestions)
+        counters = [m.value for m in at.markdown if 'class="status-card' in m.value]
+        assert 'Yazım önerisi' in counters[-1] and 'Kontrol bulgusu' not in ''.join(counters)
+        assert any('Not: Kayıt karşılaştırmasında 1 kontrol bulgusu' in c.value for c in at.caption)
+        assert not at.warning
+        assert any('Olması gereken' in m.value and 'Olan' in m.value for m in at.markdown)
+        at.run()
+        assert at.session_state['entry_result'] == result  # Widget reruns preserve the report.
+        next(s for s in at.selectbox if s.label == 'KKBS · Denetlenecek özet sütunu').set_value(-1).run()
+        assert 'entry_result' not in at.session_state
+        click(at, 'Girişleri karşılaştır')
+        assert not at.session_state['entry_result']['summary_review']['available']
+        assert at.session_state['entry_result']['different'] == 1

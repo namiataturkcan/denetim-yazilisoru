@@ -9,7 +9,9 @@ from entry_comparison import (VERSION, compare_records, issue_rows, read_sheets,
                               records, report_csv, suggest_mapping, suggest_header,
                               suggest_sheet, suggest_sheet_pair, sheet_score, text, validate_ebys_source)
 from incoming_papers import MAX_TABLE_BYTES, TableError, sheet_names
-from entry_comparison_view import group_mismatches, mismatch_table
+from entry_comparison_view import group_mismatches, mismatch_table, writing_suggestions_table
+from summary_proofreading import (VERSION as WRITING_VERSION, review_summaries,
+                                  suggest_summary_column, suggestions_csv)
 
 
 def digest(value):
@@ -69,22 +71,21 @@ def show_table(items):
 
 def render_result(report, recipients):
     st.subheader('Giriş Karşılaştırma Sonucu')
+    writing = report['summary_review']
+    suggestions = writing['suggestions']
+    writing_checked = writing['available'] and writing['checked_count'] > 0
     values = (('Eşleşen evrak', report['matched'], 'neutral'),
               ('Uyumlu', report['clean']+report['spelling'], 'uygun'),
               ('Uyuşmayan evrak', report['different'], 'uyari'),
-              ('Kontrol bulgusu', sum(i['status'] == 'belirsiz' for i in report['issues']), 'belirsiz'))
+              ('Yazım önerisi', len(suggestions) if writing_checked else '—', 'belirsiz' if writing_checked else 'neutral'))
     for col, (label, count, tone) in zip(st.columns(4), values):
         col.markdown(f'<div class="status-card {tone if count else "neutral"}"><div>{label}</div>'
                      f'<div class="status-count">{count}</div></div>', unsafe_allow_html=True)
-    st.caption(f"KKBS: {report['kkbs_count']} kayıt · EBYS: {report['ebys_count']} kayıt. "
-               'Bir evrakta birden fazla kontrol bulgusu olabilir. Açıklaması boş kayıtlar da kapsama dahildir.')
+    st.caption(f"KKBS: {report['kkbs_count']} kayıt · EBYS: {report['ebys_count']} kayıt.")
     red = [i for i in report['issues'] if i['status'] == 'uyari']
     yellow = [i for i in report['issues'] if i['status'] == 'belirsiz']
     if not report['matched']:
         st.error('Ortak evrak numarasıyla birebir eşleşen kayıt bulunamadı. Sayfaları, evrak numarası sütunlarını ve rapor kapsamını kontrol edin.')
-    elif not report['complete']:
-        st.warning(f"Karşılaştırma tam olarak doğrulanamadı. Eşleşmeyen KKBS satırı: {report['unmatched_kkbs']}; "
-                   f"EBYS satırı: {report['unmatched_ebys']}. Kontrol listesindeki kayıtları inceleyin.")
     if red:
         st.error(f"{report['different']} evrakta milletvekili veya bakanlık uyuşmazlığı bulundu. Hangi girişin doğru olduğunu önergenin aslından kontrol edin.")
         groups = group_mismatches(red)
@@ -96,6 +97,31 @@ def render_result(report, recipients):
         st.success('Eşleşen bütün kayıtlarda milletvekili ve bakanlık bilgileri uyumlu.')
     elif report['matched']:
         st.info('Belirgin uyuşmazlık bulunmadı; kontrol listesindeki kayıtlar henüz doğrulanmış sayılmaz.')
+    st.subheader('KKBS Özetleri · Yazım Önerileri')
+    if not writing['available']:
+        st.caption('Özet sütunu seçilmedi; yazım denetimi yapılmadı. “Sayfa ve sütunları kontrol et” bölümünden KKBS özet sütununu seçebilirsiniz.')
+    elif not writing['checked_count']:
+        st.caption('Seçilen sütunda güvenle ayrılabilen, dolu bir asıl özet metni bulunamadı.')
+    elif suggestions:
+        st.caption(f"{writing['checked_count']} özet denetlendi; {writing['affected_count']} özette {len(suggestions)} öneri bulundu. "
+                   'Yalnızca asıl özet cümlesi denetlenir; kişi/yer adları ve otomatik eklenen bilgiler kapsam dışıdır. '
+                   'Bağlama bağlı önerileri metnin anlamına göre değerlendirin.')
+        st.markdown(writing_suggestions_table(suggestions[:500]), unsafe_allow_html=True)
+        if len(suggestions) > 500:
+            st.caption('İlk 500 yazım önerisi gösteriliyor; indirilen rapor bütün önerileri içerir.')
+        st.download_button('Yazım önerilerini indir (CSV)', suggestions_csv(writing),
+                           file_name='kkbs-ozet-yazim-onerileri.csv', mime='text/csv', on_click='ignore')
+    else:
+        st.caption(f"{writing['checked_count']} özette tanımlı yazım kuralları kapsamında öneri bulunmadı. Kişi ve yer adları denetlenmez.")
+    if writing['empty_count']:
+        st.caption(f"Not: {writing['empty_count']} kaydın özeti boş olduğu için yazım denetimi yapılmadı.")
+    if writing['skipped_documents']:
+        st.caption(f"Not: {len(writing['skipped_documents'])} kayıtta asıl özet cümlesi güvenle ayrılamadığı için yazım denetimi yapılmadı. "
+                   'Evrak numaraları ayrıntılı JSON raporunda yer alır.')
+    if yellow or not report['complete']:
+        st.caption(f"Not: Kayıt karşılaştırmasında {len(yellow)} kontrol bulgusu var. "
+                   f"Eşleşmeyen KKBS kaydı: {report['unmatched_kkbs']}; EBYS kaydı: {report['unmatched_ebys']}. "
+                   'Eksik veya belirsiz bilgiler aşağıdaki kontrol listesinde yer alır; bu kayıtlar doğrulanmış sayılmaz.')
     if yellow:
         with st.expander(f'Kontrol gerekli · {len(yellow)} bulgu'):
             st.caption('Eksik, birden fazla eşleşen veya ayrıştırılamayan bilgiler burada gösterilir.')
@@ -187,6 +213,15 @@ def render_entry_comparison(recipients, reference_names):
             left, right = st.columns(2)
             with left:
                 kkbs_header, kkbs_mapping = column_controls(sheets[0], 'KKBS', source_key)
+                summary_headers = sheets[0].headers(kkbs_header)
+                summary_options = [-1, *range(len(summary_headers))]
+                suggested_summary = suggest_summary_column(sheets[0], kkbs_header)
+                summary_selection = st.selectbox('KKBS · Denetlenecek özet sütunu', summary_options,
+                    index=summary_options.index(-1 if suggested_summary is None else suggested_summary),
+                    key=f'entry_summary_{source_key}_{kkbs_header}',
+                    format_func=lambda i: 'Seçilmedi' if i == -1 else f'{get_column_letter(i+1)} · {text(summary_headers[i]) or "Başlıksız"}',
+                    help='Yalnız asıl özet cümlesi denetlenir. Birleşik hücredeki otomatik milletvekili, muhatap ve tarih bilgileri kapsam dışıdır.')
+                summary_column = None if summary_selection == -1 else summary_selection
             with right:
                 ebys_header, ebys_mapping = column_controls(sheets[1], 'EBYS', source_key)
         for side, name, header, mapping in (('KKBS', kkbs_name, kkbs_header, kkbs_mapping),
@@ -195,10 +230,11 @@ def render_entry_comparison(recipients, reference_names):
                                   for field, label in (('document', 'Evrak'), ('member', 'Milletvekili'), ('ministry', 'Bakanlık')))
             st.caption(f'{side} / {name} · {selected} · ' + ('Başlık yok; ilk satır dahil' if header == 0 else f'Başlık: {header}. satır'))
         validate_ebys_source(sheets[1], ebys_header, ebys_mapping)
-        config = {'workflow': workflow, 'version': VERSION,
+        config = {'workflow': workflow, 'version': VERSION, 'summary_review_version': WRITING_VERSION,
                   'reference_sha256': digest([recipients, sorted(reference_names)]),
                   'kkbs': {'file_name': kfile['name'], 'document_sha256': kfile['sha256'],
-                           'sheet': kkbs_name, 'header_row': kkbs_header, 'columns': kkbs_mapping},
+                           'sheet': kkbs_name, 'header_row': kkbs_header, 'columns': kkbs_mapping,
+                           'summary_column': summary_column},
                   'ebys': {'file_name': efile['name'], 'document_sha256': efile['sha256'],
                            'sheet': ebys_name, 'header_row': ebys_header, 'columns': ebys_mapping}}
         if workflow == 'after':
@@ -215,6 +251,7 @@ def render_entry_comparison(recipients, reference_names):
                 kkbs = records(sheets[0], kkbs_header, kkbs_mapping)
                 ebys = records(sheets[1], ebys_header, ebys_mapping)
                 result = compare_records(kkbs, ebys, recipients, reference_names)
+                result['summary_review'] = review_summaries(sheets[0], kkbs, summary_column, recipients, header=kkbs_header)
                 result['source'] = config
                 st.session_state['entry_result'] = result
                 st.session_state['entry_result_key'] = result_key
