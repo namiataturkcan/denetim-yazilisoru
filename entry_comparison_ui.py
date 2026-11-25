@@ -105,14 +105,14 @@ def render_result(report, recipients):
     elif suggestions:
         st.caption(f"{writing['checked_count']} özet denetlendi; {writing['affected_count']} özette {len(suggestions)} öneri bulundu. "
                    'Yalnızca asıl özet cümlesi denetlenir; kişi/yer adları ve otomatik eklenen bilgiler kapsam dışıdır. '
-                   'Bağlama bağlı önerileri metnin anlamına göre değerlendirin.')
+                   'Özetin “ilişkin” ile bitmesi de kontrol edilir. Bağlama bağlı önerileri metnin anlamına göre değerlendirin.')
         st.markdown(writing_suggestions_table(suggestions[:500]), unsafe_allow_html=True)
         if len(suggestions) > 500:
             st.caption('İlk 500 yazım önerisi gösteriliyor; indirilen rapor bütün önerileri içerir.')
         st.download_button('Yazım önerilerini indir (CSV)', suggestions_csv(writing),
                            file_name='kkbs-ozet-yazim-onerileri.csv', mime='text/csv', on_click='ignore')
     else:
-        st.caption(f"{writing['checked_count']} özette tanımlı yazım kuralları kapsamında öneri bulunmadı. Kişi ve yer adları denetlenmez.")
+        st.caption(f"{writing['checked_count']} özette tanımlı yazım kuralları ve “ilişkin” bitişi kapsamında öneri bulunmadı. Kişi ve yer adları denetlenmez.")
     if writing['empty_count']:
         st.caption(f"Not: {writing['empty_count']} kaydın özeti boş olduğu için yazım denetimi yapılmadı.")
     if writing['skipped_documents']:

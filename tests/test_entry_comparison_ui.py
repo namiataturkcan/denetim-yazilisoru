@@ -119,7 +119,7 @@ def test_writing_check_uses_only_kkbs_summary_and_moves_control_count_to_note(mo
     headers = [*HEADERS[:4], 'Özet']
     data = workbook(headers=headers,
         left=[[100, 'Çiçek Otlu', 'Çevre Bakanı', '', "personelin  unvan değişikliğine ve Sayıştay Başkanlığı'na ilişkin"],
-              [102, 'Çiçek Otlu', 'Çevre Bakanı', '', 'haklar  konusunda']],
+              [102, 'Çiçek Otlu', 'Çevre Bakanı', '', 'haklara  ilişkin']],
         right=[[100, 'Cengiz Çiçek', 'Adalet Bakanı', '', 'herkez yalnış']])
     at = setup(monkeypatch)
     with patch('streamlit.file_uploader', return_value=[Upload(data)]), \
@@ -145,3 +145,30 @@ def test_writing_check_uses_only_kkbs_summary_and_moves_control_count_to_note(mo
         click(at, 'Girişleri karşılaştır')
         assert not at.session_state['entry_result']['summary_review']['available']
         assert at.session_state['entry_result']['different'] == 1
+
+
+def test_misspelled_ending_and_kayyum_are_shown_and_old_report_is_invalidated(monkeypatch):
+    from test_entry_sources import joined_workbook
+    from openpyxl import load_workbook
+    import io
+    book = load_workbook(io.BytesIO(joined_workbook()))
+    book['Sheet1']['C3'] = ("Ankara Milletvekili Ahmet Yılmaz'ın, belediyeye kayyum atanmasına ilişki "
+                          "Çevre Bakanı'ndan yazılı soru önergesi")
+    data = io.BytesIO(); book.save(data)
+    at = setup(monkeypatch)
+    with patch('streamlit.file_uploader', return_value=[Upload(data.getvalue())]), \
+         patch('app.analyze', side_effect=AssertionError('No API allowed')):
+        at.run(); click(at, 'Girişleri karşılaştır')
+        assert not at.exception
+        report = at.session_state['entry_result']
+        assert report['summary_review']['checked_count'] == 2
+        assert not report['summary_review']['skipped_documents']
+        findings = report['summary_review']['suggestions']
+        assert [(i['before'], i['after']) for i in findings] == [('kayyum', 'kayyım'), ('ilişki', 'ilişkin')]
+        assert all(i['document'] == '90001' for i in findings)
+        html = ''.join(m.value for m in at.markdown if 'entry-writing-table' in m.value)
+        assert all(v in html for v in ('90001', 'kayyım', 'ilişkin'))
+        assert any('Yazım önerisi' in m.value and '>2<' in m.value for m in at.markdown)
+        with patch('entry_comparison_ui.WRITING_VERSION', 'new-rules'):
+            at.run()
+            assert not at.exception and 'entry_result' not in at.session_state

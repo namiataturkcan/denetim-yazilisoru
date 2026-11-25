@@ -1,15 +1,16 @@
 """Offline, bounded TDK-based suggestions for KKBS summaries, never source edits.
 
-Rules were checked against TDK on 2026-11-20. This is a focused writing check,
+Rules were checked against TDK on 2026-11-20; kayyum/kayyım on 2026-11-25. This is a focused writing check,
 not a dictionary/identity validator for people or places or a full grammar parser.
 """
 import csv
 import hashlib
 import io
+from functools import lru_cache
 from pathlib import Path
 import re
 
-from entry_comparison import ministry_identity, text
+from entry_comparison import MINISTRIES, folded, one_edit, text
 from incoming_papers import key
 
 VERSION = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
@@ -18,6 +19,7 @@ SOURCES = {
     'apostrophe': 'https://tdk.gov.tr/icerik/yazim-kurallari/kesme-isareti/',
     'capitals': 'https://tdk.gov.tr/icerik/yazim-kurallari/buyuk-harflerin-kullanildigi-yerler/',
     'punctuation': 'https://tdk.gov.tr/icerik/yazim-kurallari/noktalama-isaretleri-aciklamalar/',
+    'summary_format': 'Kullanıcının KKBS özet biçimi kuralı: son sözcük “ilişkin” olmalıdır.',
 }
 SUMMARY_HEADERS = ('Özet', 'Önerge Özeti', 'Soru Özeti', 'Önergenin Özeti', 'Konu Özeti',
                    'Önerge Sahibi Özeti', 'Sahibi ve Özeti', 'Konu')
@@ -51,21 +53,59 @@ def suggest_summary_column(sheet, header):
     return None
 
 
+@lru_cache(maxsize=8)
+def _recipient_tail(titles):
+    # Cache only public office patterns, never uploaded summaries.
+    variants = set(titles)
+    for title, aliases in MINISTRIES.items():
+        if title == 'Cumhurbaşkanı Yardımcısı':
+            variants.update(aliases)
+        else:
+            variants.update(alias + ' bakani' for alias in aliases)
+    letters = {'a': '[aâ]', 'c': '[cç]', 'g': '[gğ]', 'i': '[iıî]',
+               'o': '[oö]', 's': '[sş]', 'u': '[uüû]'}
+    offices = []
+    for title in sorted(variants, key=len, reverse=True):
+        offices.append(r',?\s+'.join(''.join(letters.get(c, re.escape(c)) for c in word)
+                                    for word in folded(title).split()))
+    return re.compile(r'\b(?:' + '|'.join(offices) + r')' + APOSTROPHE + r'?ndan'
+        r'(?:\s*\([^()]{1,120}\))?\s+yazılı\s+soru\s+önergesi'
+        r'(?:\s*\(Başkanlığa\s+geliş\s+tarihi\s*:[^()]{1,60}\))?[\s.]*$', re.I)
+
+
 def summary_text(value, combined, recipients):
-    """Strip the generated KKBS wrapper only when both boundaries are recognized."""
+    """Find the summary using the owner and recipient, regardless of its last word."""
     value = text(value)
     owner = re.match(r'^.{0,65}?\b(?:Milletvekili|Mv\.)\s+[^,\n]{1,100},\s*', value, re.I)
     if owner:
-        for match in reversed(list(re.finditer(r'\bilişkin\b', value, re.I))):
-            tail = value[match.end():]
-            if (match.start() >= owner.end()
-                    and re.search(r'\byazılı\s+soru\s+önergesi\b', tail, re.I)
-                    and ministry_identity(tail, recipients)[0]):
-                return value[owner.end():match.end()].strip()
+        tail = _recipient_tail(tuple(recipients)).search(value, owner.end())
+        if tail:
+            return value[owner.end():tail.start()].strip()
     # A broken combined template must never be mistaken for the manual summary.
     if combined or (owner and re.search(r'yazılı\s+soru\s+önergesi|Başkanlığa\s+geliş', value, re.I)):
         return None
     return value
+
+
+def check_summary_ending(value):
+    """The required KKBS ending is a workflow rule, independent of TDK membership."""
+    value = text(value)
+    if not value:
+        return []  # Empty/unreadable summaries are separately reported, never approved.
+    last = re.search(r'\b(?P<word>[' + LETTERS + r']+)(?P<punctuation>[^\w]*)$', value)
+    if last:
+        word = last['word'].translate(str.maketrans('Iİ', 'ıi')).lower()
+        if word == 'ilişkin' and not last['punctuation']:
+            return []
+        if (one_edit(folded(word), 'iliskin')
+                and re.fullmatch(r'[.,;:!?…]*', last['punctuation'])):
+            return [dict(start=last.start(), end=len(value), before=value[last.start():], after='ilişkin',
+                         rule='summary_ending', conditional=False, source=SOURCES['summary_format'],
+                         reason='KKBS özetinin son sözcüğü “ilişkin” olmalıdır; hatalı bitişi düzeltin.')]
+    # Do not fabricate a grammatical rewrite for a different or missing ending.
+    return [dict(start=0, end=len(value), before=value, after='… ilişkin', rule='summary_ending',
+                 conditional=True, source=SOURCES['summary_format'],
+                 reason='Özet “ilişkin” ile bitmiyor. Son ifadeyi anlamını koruyarak “… ilişkin” biçiminde düzenleyin; önceki sözcüğün hâl eki de değişebilir.')]
 
 
 def _protected_spans(value):
@@ -110,6 +150,10 @@ def check_summary(value, recipients, *, sentence_initial=True):
     for m in re.finditer(r'\bunvan[' + LETTERS + r']*\b', value):
         if unprotected(m):
             add(*m.span(), 'ünvan' + m.group()[5:], 'unvan', 'Güncel TDK sözlüğünde sözcük “ünvan” olarak yer alır.', 'dictionary')
+    for m in re.finditer(r'\bkayyum(?:(?:lar|lu[kğ]|u|a|d[au]|la|c[au]|suz|ken)[' + LETTERS + r']*)?\b', value, re.I):
+        if unprotected(m):
+            add(*m.span(), m.group().translate(str.maketrans('uU', 'ıI')), 'kayyim',
+                'TDK, “kayyum” maddesini “kayyım” biçimine yönlendirir. Ekli kullanımlarda da ünlü uyumu korunur.', 'dictionary')
 
     # Institutional names differ from personal titles: Başkanlığına, but Başkanı’na.
     for m in INSTITUTION_RE.finditer(value):
@@ -167,6 +211,8 @@ def review_summaries(sheet, source_records, column, recipients, *, header=0):
             continue
         report['checked_count'] += 1
         findings = check_summary(value, recipients, sentence_initial=value == original)
+        findings.extend(check_summary_ending(value))
+        findings.sort(key=lambda finding: (finding['start'], finding['end'], finding['rule']))
         if findings:
             affected.add(number)
         for finding in findings:
