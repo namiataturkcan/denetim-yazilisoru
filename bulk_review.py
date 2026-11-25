@@ -538,18 +538,9 @@ def compare_proposal(review, pages, physical_pages, records, boundary_warnings=(
     for warning in boundary_warnings:
         findings.append(issue(display_number, physical_pages, 'belirsiz', 'Sayfa eşleştirme', warning, inferred=inferred))
     findings.extend(continuation_number_findings(review, pages, physical_pages, number, display_number, inferred))
-    reference = {'source': {'type': 'uploaded_kkbs'}, 'members': {}, 'invalid_constituency_labels': ['Dersim']}
-    # A wrong KKBS owner must not make a clearly read, source-backed province
-    # look unreadable. Formal constituency validation uses the consistent pairs
-    # in this uploaded group; row-to-document comparisons below remain exact-ID.
-    member_rows = defaultdict(list)
-    for source in records:
-        if source.member and source.province:
-            member_rows[normalize(source.member)].append(source)
-    for sources in member_rows.values():
-        if len({normalize(source.province) for source in sources}) == 1:
-            reference['members'][sources[0].member] = sources[0].province
-    finalized = service.finalize(review, pages, member_reference=reference)
+    # The independent user directory is authoritative. A wrong province copied
+    # into both PDF and KKBS must not approve itself; exact-ID comparisons follow.
+    finalized = service.finalize(review, pages)
     for check in finalized['review']['checks']:
         if check['status'] == 'uygun':
             continue

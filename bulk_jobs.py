@@ -9,6 +9,7 @@ from time import monotonic
 
 from fastapi import HTTPException
 from openai import APIConnectionError, APIStatusError, APITimeoutError
+from app import MEMBER_REFERENCE
 
 from bulk_review import (BULK_VERSION, INDEX_WINDOW, MAX_PROPOSALS, TableError, coverage_notes, index_pages, issue,
                          IndexedPage, index_context_numbers, make_units, reconciliation, render_pages, review_unit)
@@ -199,6 +200,7 @@ class BulkJob:
             coverage = matching_coverage(self.records, results, self.unassigned)
             processing_complete = self.state == 'complete' and not any(r['failed'] for r in results)
             return {'version': self.version, 'source_id': self.source_id, 'state': self.state,
+                    'member_reference_source': dict(MEMBER_REFERENCE['source']),
                     'is_test': self.is_test, 'tested_pages': list(self.page_numbers),
                     'original_page_count': self.original_page_count,
                     'phase': self.phase, 'message': self.message,

@@ -3,10 +3,16 @@ from recipient_validation import normalize
 from reading_validation import evidence_present, field_present, serious_disagreement
 
 
+def reference_pairs(reference):
+    """All permitted pairs, retaining distinct members who share a full name."""
+    return {**{name: (province,) for name, province in reference['members'].items()},
+            **{name: tuple(provinces) for name, provinces in reference.get('namesakes', {}).items()}}
+
+
 def validate_constituency(review, pages, reference, comparisons=None):
     check = next(c for c in review.checks if c.kind == 'secim_cevresi')
     readings = {p.page: p for p in review.pages}
-    members = {normalize(name): (name, province) for name, province in reference['members'].items()}
+    members = {normalize(name): (name, provinces) for name, provinces in reference_pairs(reference).items()}
     invalid_labels = {normalize(x) for x in reference.get('invalid_constituency_labels', [])}
     outcomes = []
     if not review.signatories:
@@ -43,19 +49,20 @@ def validate_constituency(review, pages, reference, comparisons=None):
             explanation = f'“{signer.constituency}” kullanıcı tarafından seçim çevresi adı olarak kabul edilmiyor.'
             member = members.get(normalize(signer.name))
             if member:
-                explanation += f' Excel’de {member[0]} için seçim çevresi {member[1]}.'
+                explanation += f' Kullanıcının listesinde {member[0]} için seçim çevresi: {", ".join(member[1])}.'
             quote = signer.constituency
         elif normalize(signer.name) not in members:
             status = 'kaynak_yok'
-            explanation = f'{signer.name} için yüklenen Excel’de tekil bir seçim çevresi kaydı yok. Okunan il: {signer.constituency}. Kaynak olmadan doğru/yanlış kararı verilmedi.'
+            explanation = f'{signer.name} için kullanıcının milletvekili listesinde kayıt yok. Okunan il: {signer.constituency}. Kaynak olmadan doğru/yanlış kararı verilmedi.'
         else:
-            name, expected = members[normalize(signer.name)]
-            if normalize(signer.constituency) != normalize(expected):
+            name, provinces = members[normalize(signer.name)]
+            expected = ', '.join(provinces)
+            if normalize(signer.constituency) not in {normalize(p) for p in provinces}:
                 status = 'uyari'
-                explanation = f'Yüklenen 28. dönem Excel’inde {name}: {expected}. Belgede {signer.constituency} yazıyor; milletvekili–seçim çevresi eşleşmesi hatalı.'
+                explanation = f'Kullanıcının 28. dönem milletvekili listesinde {name}: {expected}. Belgede {signer.constituency} yazıyor; milletvekili–seçim çevresi eşleşmesi hatalı.'
                 quote = signer.constituency
             else:
-                explanation = f'{name} – {expected} eşleşmesi yüklenen 28. dönem Excel’indeki kayıtla uyumlu.'
+                explanation = f'{name} – {signer.constituency} eşleşmesi kullanıcının 28. dönem milletvekili listesiyle uyumlu.'
         outcomes.append((status, signer.page, quote, explanation, signer.evidence))
     # Keep a definite error visible; retain every signer's outcome in the explanation.
     priority = {'uyari': 0, 'belirsiz': 1, 'kaynak_yok': 2, 'uygun': 3}

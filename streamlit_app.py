@@ -93,7 +93,7 @@ def main():
         render_incoming(RULES["recipients"])
         return
     if section == 'second_reader':
-        render_entry_comparison(RULES['recipients'], MEMBER_REFERENCE['members'])
+        render_entry_comparison(RULES['recipients'], MEMBER_REFERENCE)
         return
     render_review()
 

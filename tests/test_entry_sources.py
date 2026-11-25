@@ -46,7 +46,7 @@ def test_detects_original_subject_skips_helper_and_preserves_first_record():
     kkbs, ebys = read_sheets(data, pair)
     assert suggest_header(kkbs) == 2 and suggest_header(ebys) == 0
     km, em = suggest_mapping(kkbs, 2), suggest_mapping(ebys, 0)
-    assert em == dict(document=1, member=0, ministry=0, case=None)
+    assert em == dict(document=1, member=0, ministry=0, case=None, province=None)
     validate_ebys_source(ebys, 0, em)
     right = records(ebys, 0, em)
     assert [r['row'] for r in right] == [1, 2, 4]

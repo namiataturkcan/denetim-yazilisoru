@@ -77,6 +77,18 @@ def test_shared_subject_is_shown_once_per_side_for_two_findings():
     assert content.count(left) == 1 and content.count(right) == 1
 
 
+def test_identical_wrong_province_is_highlighted_without_marking_summary_places():
+    left = 'İstanbul Milletvekili Ayten Kordu’nun, İstanbul ulaşımına ilişkin önergesi'
+    item = dict(status='uyari', field='province', document='100', case='',
+                kkbs=left, ebys=left, kkbs_row=3, ebys_row=8,
+                explanation='KKBS’de İstanbul; kullanıcının listesinde Tunceli.')
+    html = mismatch_table([[item]], RECIPIENTS)
+    parsed = Parsed(html)
+    assert parsed.marked == ['İstanbul', 'İstanbul']
+    assert 'kullanıcının listesinde Tunceli' in html
+    assert ''.join(parsed.content).count(left) == 2
+
+
 def test_writing_table_preserves_extra_spaces_and_escapes_uploaded_text():
     from entry_comparison_view import writing_suggestions_table
     value = '<img src=x onerror=alert(1)> iki  kelime'

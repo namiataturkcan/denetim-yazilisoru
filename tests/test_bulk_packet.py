@@ -16,7 +16,7 @@ PACKET_HEADER = ['Paket Adı', None, 'Genel Evrak No', 'Önerge Sahibi Özeti', 
 
 def packet(number='7/50000', text=None):
     if text is None:
-        text = "Kocaeli Milletvekili Test Vekil'in, kamu personeli alımlarına ilişkin Adalet Bakanı'ndan yazılı soru önergesi (Başkanlığa geliş tarihi: 01-01-2026)"
+        text = "Kocaeli Milletvekili Ömer Faruk GERGERLİOĞLU'nun, kamu personeli alımlarına ilişkin Adalet Bakanı'ndan yazılı soru önergesi (Başkanlığa geliş tarihi: 01-01-2026)"
     book = openpyxl.Workbook()
     book.active.title = 'Sayfa1'
     book.active.append(['Adalet Bakanı', 'ADALET BAKANLIĞI'])
@@ -51,7 +51,7 @@ def test_packet_preserves_source_names_and_constituencies(province, member):
 
 
 def test_missing_or_malformed_metadata_is_not_inferred_from_summary():
-    data = packet(text="Ankara hakkında bir konu ve Test Vekil ile Adalet Bakanı'ndan bahseden bozuk kayıt")
+    data = packet(text="Ankara hakkında bir konu ve Ömer Faruk GERGERLİOĞLU ile Adalet Bakanı'ndan bahseden bozuk kayıt")
     records, _ = bulk.read_kkbs(data, 'Veri')
     assert not records[0].member and not records[0].province and not records[0].title
     review, pages = reading()
@@ -70,7 +70,7 @@ def test_packet_header_requires_exact_layout_or_explicit_number_column():
     data = workbook([['Paket Adı', 'Genel Evrak No', 'Önerge Sahibi Özeti'], ['Grup', 1980000, 'Metin']])
     with pytest.raises(bulk.TableError, match='Genel Evrak No esas numarası değildir'):
         bulk.read_kkbs(data, 'Rapor')
-    data = workbook([['Esas No', 'Önerge Sahibi Özeti'], ['7/50000', "Kocaeli Milletvekili Test Vekil'in, hizmetlere ilişkin Adalet Bakanı'ndan yazılı soru önergesi"]])
+    data = workbook([['Esas No', 'Önerge Sahibi Özeti'], ['7/50000', "Kocaeli Milletvekili Ömer Faruk GERGERLİOĞLU'nun, hizmetlere ilişkin Adalet Bakanı'ndan yazılı soru önergesi"]])
     assert bulk.read_kkbs(data, 'Rapor')[0][0].number == 50000
 
 

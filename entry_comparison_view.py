@@ -3,7 +3,7 @@ from difflib import SequenceMatcher
 from html import escape
 import re
 
-from entry_comparison import LABELS, folded, member_name, ministry_identity, text
+from entry_comparison import LABELS, folded, member_name, member_province, ministry_identity, text
 
 
 def group_mismatches(items):
@@ -19,7 +19,7 @@ def _html(value):
     return escape(str(value)).replace('\n', '<br>')
 
 
-def highlighted_pair(left, right):
+def highlighted_pair(left, right, *, provinces=False):
     """Word-level visual differences, preserving the full original text on each side."""
     values = (text(left), text(right))
     tokens = [list(re.finditer(r'\w+|[^\w\s]', value)) for value in values]
@@ -38,8 +38,21 @@ def highlighted_pair(left, right):
                     spans[side].append((tokens[side][start].start(), tokens[side][end-1].end()))
     rendered = []
     for value, ranges in zip(values, spans):
+        if provinces:
+            # A directory violation can be identical in both registers; still
+            # mark the owner province, without marking places in the narrative.
+            province = member_province(value) or (value if re.fullmatch(r'[^\W\d_]+', value) else '')
+            match = re.search(r'\b' + re.escape(province) + r'\b', value) if province else None
+            if match:
+                ranges.append(match.span())
+        merged = []
+        for start, end in sorted(ranges):
+            if merged and start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+            else:
+                merged.append((start, end))
         parts, offset = [], 0
-        for start, end in ranges:
+        for start, end in merged:
             parts.extend((_html(value[offset:start]), '<mark class="entry-changed">',
                           _html(value[start:end]), '</mark>'))
             offset = end
@@ -74,7 +87,7 @@ def mismatch_table(groups, recipients):
             pairs.setdefault((text(item['kkbs']), text(item['ebys'])), []).append(LABELS[item['field']])
         columns = [[], []]
         for (left, right), fields in pairs.items():
-            for side, marked in enumerate(highlighted_pair(left, right)):
+            for side, marked in enumerate(highlighted_pair(left, right, provinces=LABELS['province'] in fields)):
                 label = f'<h5>{_html(" / ".join(fields))}</h5>' if len(pairs) > 1 else ''
                 columns[side].append(f'<section>{label}<p class="entry-source-text">{marked}</p></section>')
         parts.append('<div class="entry-comparison-pair">')

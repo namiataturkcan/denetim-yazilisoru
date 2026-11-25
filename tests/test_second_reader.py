@@ -78,7 +78,9 @@ def test_raw_files_match_combined_result_and_file_order_is_detected(monkeypatch,
         assert before['matched'] == 2 and before['different'] == 2 and before['unmatched_ebys'] == 1
         assert before['source']['workflow'] == 'before' and before['api_requests'] == 0
         assert before['source']['kkbs']['document_sha256'] != before['source']['ebys']['document_sha256']
-        assert {i['field'] for i in before['issues'] if i['status'] == 'uyari'} == {'member', 'ministry'}
+        assert {i['field'] for i in before['issues'] if i['status'] == 'uyari'} == {'member', 'ministry', 'province'}
+        # Both fixture sources say Ankara; the independent list says İstanbul.
+        assert all('İstanbul' in i['explanation'] for i in before['issues'] if i['field'] == 'province')
     with patch('streamlit.file_uploader', return_value=[Upload(combine(data))]):
         at.run()
         assert 'entry_result' not in at.session_state

@@ -18,6 +18,23 @@ class Upload:
         return self.data
 
 
+def test_province_reference_change_invalidates_result_even_with_same_names(monkeypatch):
+    import app
+    from copy import deepcopy
+    at = setup(monkeypatch)
+    with patch('streamlit.file_uploader', return_value=[Upload()]):
+        at.run()
+        click(at, 'Girişleri karşılaştır')
+        old_key = at.session_state['entry_result_key']
+        reference = deepcopy(app.MEMBER_REFERENCE)
+        reference['members']['Çiçek OTLU'] = 'Ankara'
+        monkeypatch.setattr(app, 'MEMBER_REFERENCE', reference)
+        at.run()
+        assert 'entry_result' not in at.session_state
+        click(at, 'Girişleri karşılaştır')
+        assert old_key != at.session_state['entry_result_key']
+
+
 def setup(monkeypatch):
     at = configured(monkeypatch, module="second_reader")
     for name in ('ONERGE_DIRECT_API_KEY', 'ONERGE_API_KEY', 'OPENAI_API_KEY'):

@@ -12,7 +12,7 @@ from test_incoming_papers import workbook
 
 
 HEADER = ['SIRA NO', 'ESAS NO', 'SAHİBİ VE ÖZETİ']
-OWNER = "Kocaeli Milletvekili Test Vekil'in, İstanbul ve Sağlık Bakanlığı hakkındaki iddialara ilişkin"
+OWNER = "Kocaeli Milletvekili Ömer Faruk GERGERLİOĞLU'nun, İstanbul ve Sağlık Bakanlığı hakkındaki iddialara ilişkin"
 
 
 def dispatch_rows():
@@ -26,7 +26,7 @@ def test_dispatch_groups_repeated_headers_and_serial_resets_keep_exact_ids():
     records, invalid = bulk.read_kkbs(workbook(dispatch_rows()), 'Rapor')
     assert not invalid and [r.number for r in records] == [50000, 50001, 50002, 50003]
     assert [r.title for r in records] == ['ADALET BAKANLIĞI', 'ADALET BAKANLIĞI', 'SAĞLIK BAKANLIĞI', 'CUMHURBAŞKANI YARDIMCISI']
-    assert [(r.member, r.province) for r in records] == [('Test Vekil', 'Kocaeli')] * 4
+    assert [(r.member, r.province) for r in records] == [('Ömer Faruk GERGERLİOĞLU', 'Kocaeli')] * 4
     assert [r.source_row for r in records] == [3, 6, 9, 12]
     assert all(not r.minister and not r.minister_in_source for r in records[:3])
     assert records[-1].minister == 'CEVDET YILMAZ' and records[-1].minister_in_source

@@ -23,7 +23,7 @@ def test_body_ocr_digit_corruption_does_not_discard_original_stamp_or_member_mis
     assert result['number'] == 50000 and result['matched']
     finding = next(i for i in result['issues'] if i['field'] == 'KKBS · Milletvekili')
     assert finding['status'] == 'uyari' and finding['pages'] == [180]
-    assert finding['expected'] == 'Başka Vekil' and finding['actual'] == 'Test Vekil'
+    assert finding['expected'] == 'Başka Vekil' and finding['actual'] == 'Ömer Faruk GERGERLİOĞLU'
 
 
 def test_wrong_row_owner_does_not_make_a_source_backed_constituency_suspicious():
@@ -32,10 +32,10 @@ def test_wrong_row_owner_does_not_make_a_source_backed_constituency_suspicious()
     result = bulk.compare_proposal(review, pages, [180], records)
     assert [i['field'] for i in result['issues']] == ['KKBS · Milletvekili']
     assert result['issues'][0]['status'] == 'uyari'
-    # Contradictory province references are never resolved by choosing a row.
+    # Contradictory rows in the group cannot override the independent directory.
     records.append(replace(record(50002), province='Ankara'))
     result = bulk.compare_proposal(review, pages, [180], records)
-    assert any(i['field']=='Şekil · Seçim çevresi' and i['status']=='belirsiz' for i in result['issues'])
+    assert [i['field'] for i in result['issues']] == ['KKBS · Milletvekili']
 
 
 def test_source_choice_does_not_pick_the_ocr_that_agrees_with_model_or_kkbs():

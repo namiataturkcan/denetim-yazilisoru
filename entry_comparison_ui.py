@@ -42,7 +42,8 @@ def column_controls(sheet, side, source_key):
     options = [None, *range(len(headers))]
     mapping = {}
     labels = {'document': 'Ortak evrak numarası', 'member': 'Milletvekili adı / sahibi',
-              'ministry': 'Bakanlık / muhatap', 'case': 'Esas numarası (isteğe bağlı)'}
+              'ministry': 'Bakanlık / muhatap', 'case': 'Esas numarası (isteğe bağlı)',
+              'province': 'Seçim çevresi (ayrı sütun varsa)'}
     for field, label in labels.items():
         mapping[field] = st.selectbox(f'{side} · {label}', options,
             index=options.index(guessed[field]), key=f'{prefix}_{header}_{field}',
@@ -87,9 +88,9 @@ def render_result(report, recipients):
     if not report['matched']:
         st.error('Ortak evrak numarasıyla birebir eşleşen kayıt bulunamadı. Sayfaları, evrak numarası sütunlarını ve rapor kapsamını kontrol edin.')
     if red:
-        st.error(f"{report['different']} evrakta milletvekili veya bakanlık uyuşmazlığı bulundu. Hangi girişin doğru olduğunu önergenin aslından kontrol edin.")
+        st.error(f"{report['different']} evrakta milletvekili, seçim çevresi veya bakanlık uyuşmazlığı bulundu. Hangi girişin doğru olduğunu önergenin aslından kontrol edin.")
         groups = group_mismatches(red)
-        st.caption("Açıklamaya tıklayarak iki kaydın tam metnini açın. Kırmızı zemin, metinler arasındaki farkları gösterir.")
+        st.caption("Açıklamaya tıklayarak iki kaydın tam metnini açın. Kırmızı zemin, metinler arasındaki farkları ve seçim çevresi bulgusuna konu olan ili gösterir.")
         st.markdown(mismatch_table(groups[:500], recipients), unsafe_allow_html=True)
         if len(groups) > 500:
             st.caption('İlk 500 evrak gösteriliyor; indirilen rapor bütün bulguları içerir.')
@@ -129,7 +130,8 @@ def render_result(report, recipients):
     if report['variants']:
         with st.expander(f'Uyumlu sayılan küçük yazım farkları · {len(report["variants"])} bulgu'):
             show_table(report['variants'])
-    st.caption('Bu karşılaştırma iki kaydın tutarlılığını kontrol eder; her iki kayıtta aynı yanlış bilgi bulunabilir.')
+    st.caption('Ad ve seçim çevresi için kullanıcının milletvekili listesi de kullanılır. '
+               'Seçim çevresi raporda yoksa bu alan denetlenemez. Aynı yanlış kişi iki kayıtta da seçilmişse önergenin aslı gerekir.')
     left, right = st.columns(2)
     left.download_button('Karşılaştırmayı indir (CSV)', report_csv(report),
         file_name='ebys-kkbs-karsilastirma.csv', mime='text/csv', on_click='ignore')
@@ -137,11 +139,13 @@ def render_result(report, recipients):
         file_name='ebys-kkbs-karsilastirma.json', mime='application/json', on_click='ignore')
 
 
-def render_entry_comparison(recipients, reference_names):
+def render_entry_comparison(recipients, member_reference):
     st.write('Okuma sonrası kontrolü için birleşik Excel’i; okuma öncesi kontrolü için ayrı KKBS ve EBYS dosyalarını yükleyin. '
              'Dosya sayısına göre işlem otomatik seçilir. İki durumda da milletvekili ve bakanlık girişleri karşılaştırılır.')
     st.caption('API kullanmaz; kredi tüketmez. Bakanlık kısaltmaları ve küçük yazım farkları dikkate alınır. '
                'Açıklama sütununun dolu olması gerekmez. Dosya başına en fazla 12 MB, sayfa başına 100.000 kayıt.')
+    st.caption('Milletvekili kaynağı: ' + member_reference['source']['file']
+               + ' · KKBS’deki ad ve varsa seçim çevresi bu listeyle denetlenir.')
     uploads = st.file_uploader('Birleşik Excel’i veya ayrı KKBS ve EBYS dosyalarını yükle (.xlsx)',
                                type=['xlsx'], accept_multiple_files=True, key='entry_upload')
     if not uploads:
@@ -231,7 +235,7 @@ def render_entry_comparison(recipients, reference_names):
             st.caption(f'{side} / {name} · {selected} · ' + ('Başlık yok; ilk satır dahil' if header == 0 else f'Başlık: {header}. satır'))
         validate_ebys_source(sheets[1], ebys_header, ebys_mapping)
         config = {'workflow': workflow, 'version': VERSION, 'summary_review_version': WRITING_VERSION,
-                  'reference_sha256': digest([recipients, sorted(reference_names)]),
+                  'reference_sha256': digest([recipients, member_reference]),
                   'kkbs': {'file_name': kfile['name'], 'document_sha256': kfile['sha256'],
                            'sheet': kkbs_name, 'header_row': kkbs_header, 'columns': kkbs_mapping,
                            'summary_column': summary_column},
@@ -250,7 +254,7 @@ def render_entry_comparison(recipients, reference_names):
             with st.spinner('Kayıtlar karşılaştırılıyor…'):
                 kkbs = records(sheets[0], kkbs_header, kkbs_mapping)
                 ebys = records(sheets[1], ebys_header, ebys_mapping)
-                result = compare_records(kkbs, ebys, recipients, reference_names)
+                result = compare_records(kkbs, ebys, recipients, member_reference=member_reference)
                 result['summary_review'] = review_summaries(sheets[0], kkbs, summary_column, recipients, header=kkbs_header)
                 result['source'] = config
                 st.session_state['entry_result'] = result

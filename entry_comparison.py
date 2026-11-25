@@ -10,6 +10,7 @@ from pathlib import Path
 
 from incoming_papers import MAX_COLUMNS, MAX_ROWS, TableError, _workbook, key
 from recipient_validation import normalize
+from constituency_validation import reference_pairs
 
 VERSION = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
 ALIASES = {
@@ -20,6 +21,7 @@ ALIASES = {
     'ministry': ('Önerge Muhatabı', 'Muhatap Unvanı', 'Muhatap Ünvanı', 'Muhatap', 'Bakanlık Adı',
                  'Bakanlık', 'Bakan Adı', 'Bakan', 'Gönderilen Makam'),
     'case': ('Esas No', 'Esas Numarası'),
+    'province': ('Seçim Çevresi', 'Soru Sahibi İli', 'Milletvekili İli'),
 }
 COMBINED = ('Önerge Sahibi Özeti', 'Sahibi ve Özeti', 'Konu', 'Açıklama')
 MINISTRIES = {
@@ -92,6 +94,45 @@ def member_name(value):
                                     'yazili', 'iliskin', 'hakkinda', 'konulu', 'tarafindan', 'tbmm'}:
         return ''
     return ' '.join(words)
+
+
+def member_province(value):
+    """Read only an explicit owner prefix/parenthesis, never places in the summary."""
+    value = ' '.join(text(value).split())
+    value = re.sub(r'^Yazılı Soru\s+(?:Önergesi\s+)?', '', value, flags=re.I)
+    word = r'[^\W\d_]+'
+    match = re.match(r'^(' + word + r')\s+(?:Milletvekili|Mv\.?)\s+', value, re.I)
+    if not match:
+        match = re.fullmatch(r'[\w .-]{2,120}\s+\((' + word + r')\s+(?:Milletvekili|Mv\.?)\)', value, re.I)
+    return match[1] if match else ''
+
+
+def directory_checks(left, right, directory):
+    """Validate KKBS against the independent list, and disambiguate namesakes."""
+    checks = []
+    name = member_name(left['member'])
+    if not name:
+        return checks  # Already reported by the name comparison.
+    entries = directory.get(folded(name), ())
+    if not entries:
+        return [('member_reference', 'belirsiz',
+                 f'KKBS’deki {name} adı kullanıcının milletvekili listesinde tam adla eşleşmedi; listeye göre doğrulanamadı.')]
+    allowed = {folded(province): province for _, provinces in entries for province in provinces}
+    province = left.get('province') or member_province(left['member'])
+    other = right.get('province') or member_province(right['member'])
+    if province and folded(province) not in allowed:
+        checks.append(('province', 'uyari',
+                       f'KKBS’de {name} için seçim çevresi {province}; kullanıcının listesinde {", ".join(allowed.values())}.'))
+    elif len(allowed) > 1:
+        # Equal full names alone do not prove that these are the same member.
+        if not province or not other or folded(other) not in allowed:
+            checks.append(('province', 'belirsiz',
+                           f'{name} adı listede birden fazla seçim çevresinde var ({", ".join(allowed.values())}); '
+                           'iki kayıttaki seçim çevresiyle aynı kişi olduğu doğrulanamadı.'))
+        elif folded(province) != folded(other):
+            checks.append(('province', 'uyari',
+                           f'Adlar aynı olsa da farklı milletvekilleri: KKBS {province}, EBYS {other} seçim çevresi.'))
+    return checks
 
 
 def one_edit(a, b):
@@ -402,14 +443,24 @@ def records(sheet, header_row, mapping):
 
 def finding(status, field, reason, left=None, right=None):
     left, right = left or {}, right or {}
+    def evidence(row):
+        if field == 'member_reference':
+            return row.get('member', '')
+        if field == 'province':
+            return row.get('province') or row.get('member', '')
+        return row.get(field, '')
     return {'status': status, 'field': field, 'explanation': reason,
             'document': left.get('document') or right.get('document', ''), 'case': left.get('case', ''),
             'kkbs_row': left.get('row', ''), 'ebys_row': right.get('row', ''),
-            'kkbs': left.get(field, ''), 'ebys': right.get(field, '')}
+            'kkbs': evidence(left), 'ebys': evidence(right)}
 
 
-def compare_records(kkbs, ebys, recipients, reference_names=()):
-    full_names = set(reference_names) | {member_name(r['member']) for r in kkbs if member_name(r['member'])}
+def compare_records(kkbs, ebys, recipients, reference_names=(), *, member_reference=None):
+    pairs = reference_pairs(member_reference) if member_reference is not None else {}
+    full_names = set(pairs) | set(reference_names) | {member_name(r['member']) for r in kkbs if member_name(r['member'])}
+    directory = defaultdict(list)
+    for name, provinces in pairs.items():
+        directory[folded(name)].append((name, provinces))
     known = {folded(name).replace(' ', '') for name in full_names}
     groups = [defaultdict(list), defaultdict(list)]
     issues, variants = [], []
@@ -440,6 +491,8 @@ def compare_records(kkbs, ebys, recipients, reference_names=()):
             name_cache[name_key] = compare_members(*name_key, known, full_names)
         name_status, explanation = name_cache[name_key]
         checks = [('member', name_status, explanation)]
+        if member_reference is not None:
+            checks.extend(directory_checks(left, right, directory))
         offices = []
         for raw in (left['ministry'], right['ministry']):
             if raw not in ministry_cache:
@@ -472,10 +525,12 @@ def compare_records(kkbs, ebys, recipients, reference_names=()):
             'unmatched_kkbs': len(kkbs)-matched, 'unmatched_ebys': len(ebys)-matched,
             'complete': matched == len(kkbs) == len(ebys) and not uncertain
                         and not any(i['status'] == 'belirsiz' for i in issues),
-            'issues': issues, 'variants': variants}
+            'issues': issues, 'variants': variants,
+            **({'member_reference_source': member_reference['source']} if member_reference is not None else {})}
 
 
-LABELS = {'member': 'Milletvekili', 'ministry': 'Bakanlık', 'document': 'Kayıt eşleştirme'}
+LABELS = {'member': 'Milletvekili', 'ministry': 'Bakanlık', 'document': 'Kayıt eşleştirme',
+          'province': 'Seçim çevresi', 'member_reference': 'Milletvekili listesi'}
 
 
 def issue_rows(items):

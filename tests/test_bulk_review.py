@@ -16,11 +16,11 @@ from test_incoming_papers import workbook
 
 
 HEADER = ['Esas No', 'Soru Sahibi', 'Soru Sahibi İli', 'Muhatap Unvanı', 'Soru Muhatabı', 'Donem Adı', 'Özet', 'Genel Evrak Tarihi']
-ROW = ['7/50000', 'Test Vekil', 'Kocaeli', 'Adalet Bakanı', 'Akın GÜRLEK', '28', 'Bu alan karşılaştırılmaz', '01.01.2020']
+ROW = ['7/50000', 'Ömer Faruk GERGERLİOĞLU', 'Kocaeli', 'Adalet Bakanı', 'Akın GÜRLEK', '28', 'Bu alan karşılaştırılmaz', '01.01.2020']
 
 
 def record(number=50000):
-    return bulk.KKBSRecord(number, 'Test Vekil', 'Kocaeli', 'Adalet Bakanı', 'Akın GÜRLEK', '28. Dönem', 2)
+    return bulk.KKBSRecord(number, 'Ömer Faruk GERGERLİOĞLU', 'Kocaeli', 'Adalet Bakanı', 'Akın GÜRLEK', '28. Dönem', 2)
 
 
 def reading(number='7/50000', page=1):
@@ -28,16 +28,16 @@ def reading(number='7/50000', page=1):
 Esas No: {number}
 Sorularımın Adalet Bakanı Akın GÜRLEK tarafından yazılı olarak cevaplandırılmasını arz ederim.
 Kamu personeli alımları hakkında sorular.
-Test Vekil
+Ömer Faruk GERGERLİOĞLU
 Kocaeli Milletvekili'''
-    quote = 'Test Vekil\nKocaeli Milletvekili'
+    quote = 'Ömer Faruk GERGERLİOĞLU\nKocaeli Milletvekili'
     fields = dict(page=1, uncertain=False)
     review = bulk.BulkReading(
         pages=[app.PageReading(page=1, text=text, uncertainties=[])],
         checks=[app.Check(kind=k, status='uygun', page=1, quote=q, explanation='Uygun') for k, q in zip(app.CHECK_ORDER,
-            ['Türkiye Büyük Millet Meclisi Başkanlığına', 'Test Vekil', quote,
+            ['Türkiye Büyük Millet Meclisi Başkanlığına', 'Ömer Faruk GERGERLİOĞLU', quote,
              'Adalet Bakanı Akın GÜRLEK', 'arz ederim', 'Kamu personeli alımları hakkında sorular.'])],
-        summary='', signatories=[app.Signatory(page=1, name='Test Vekil', constituency='Kocaeli', evidence=quote)],
+        summary='', signatories=[app.Signatory(page=1, name='Ömer Faruk GERGERLİOĞLU', constituency='Kocaeli', evidence=quote)],
         number=bulk.ObservedField(value=number, quote=f'Esas No: {number}', **fields),
         recipient_title=bulk.ObservedField(value='Adalet Bakanı', quote='Adalet Bakanı Akın GÜRLEK', **fields),
         recipient_name=bulk.ObservedField(value='Akın GÜRLEK', quote='Adalet Bakanı Akın GÜRLEK', **fields))

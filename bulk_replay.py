@@ -5,6 +5,7 @@ from dataclasses import asdict
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from app import MEMBER_REFERENCE
 
 from bulk_jobs import matching_coverage
 from bulk_review import (BULK_VERSION, MAX_BULK_PAGES, MAX_PROPOSALS, BulkReading, TableError,
@@ -84,6 +85,7 @@ def recheck_readings(bundle, records):
     source_id = hashlib.sha256(json.dumps([bundle.pdf_sha256, [asdict(r) for r in records], BULK_VERSION],
                                          sort_keys=True).encode()).hexdigest()
     return {'version': BULK_VERSION, 'reading_version': bundle.version, 'reading_model': bundle.model,
+            'member_reference_source': dict(MEMBER_REFERENCE['source']),
             'source_id': source_id, 'reading_pdf_sha256': bundle.pdf_sha256,
             'state': 'complete', 'phase': 'Kayıtlı okumayı yeniden kontrol',
             'message': '', 'is_test': True, 'is_replay': True, 'api_requests': 0,

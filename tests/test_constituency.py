@@ -2,6 +2,7 @@ import pytest
 from test_app import report
 import app
 from reading_validation import serious_disagreement
+from constituency_validation import reference_pairs
 
 
 def evaluate(name='Ömer Faruk GERGERLİOĞLU', city='Kocaeli', *, ocr=None, unrelated_uncertainty=False, uncertain=False):
@@ -16,7 +17,7 @@ def evaluate(name='Ömer Faruk GERGERLİOĞLU', city='Kocaeli', *, ocr=None, unr
     return next(c for c in result['review']['checks'] if c['kind']=='secim_cevresi'),result
 
 
-@pytest.mark.parametrize('name,city', list(app.MEMBER_REFERENCE['members'].items()))
+@pytest.mark.parametrize('name,city', [(n, p) for n, provinces in reference_pairs(app.MEMBER_REFERENCE).items() for p in provinces])
 def test_every_excel_pair_is_accepted(name,city):
     assert evaluate(name,city)[0]['status']=='uygun'
 
@@ -118,7 +119,9 @@ def test_independent_ocr_for_scan():
 def test_source_coverage_and_ministers_are_separate():
     from recipient_validation import normalize
     members=app.MEMBER_REFERENCE['members']
-    assert len({normalize(n) for n in members})==len(members)==312
+    assert len({normalize(n) for n in members})==len(members)==598
+    assert app.MEMBER_REFERENCE['namesakes'] == {'Mustafa DEMİR': ['Kilis', 'İstanbul']}
+    assert app.MEMBER_REFERENCE['source']['member_count'] == 600
     assert app.RULES['recipients']['İçişleri Bakanı']=='Mustafa ÇİFTÇİ'
     assert app.RULES['recipients']['Adalet Bakanı']=='Akın GÜRLEK'
     assert app.SUMMARY_STYLE['statistics']['count']==50416
