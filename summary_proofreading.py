@@ -6,6 +6,7 @@ not a dictionary/identity validator for people or places or a full grammar parse
 import csv
 import hashlib
 import io
+import json
 from functools import lru_cache
 from pathlib import Path
 import re
@@ -13,7 +14,12 @@ import re
 from entry_comparison import MINISTRIES, folded, one_edit, text
 from incoming_papers import key
 
-VERSION = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
+_district_path = Path(__file__).with_name('district_reference.json')
+_district_data = _district_path.read_bytes() if _district_path.exists() else b''
+# A source file is installed only after checking the user's actual PDF.
+DISTRICT_REFERENCE = json.loads(_district_data) if _district_data else None
+VERSION = hashlib.sha256(b'\0'.join((Path(__file__).read_bytes(),
+    Path(__file__).with_name('district_validation.py').read_bytes(), _district_data))).hexdigest()[:12]
 SOURCES = {
     'dictionary': 'https://sozluk.gov.tr/',
     'apostrophe': 'https://tdk.gov.tr/icerik/yazim-kurallari/kesme-isareti/',
@@ -187,9 +193,14 @@ def check_summary(value, recipients, *, sentence_initial=True):
     return sorted(suggestions, key=lambda s: (s['start'], s['end'], s['rule']))
 
 
-def review_summaries(sheet, source_records, column, recipients, *, header=0):
+def review_summaries(sheet, source_records, column, recipients, *, header=0, district_reference=DISTRICT_REFERENCE):
+    # Opt in only after the user's directory has been retrieved and verified.
+    from district_validation import DistrictDirectory
+    directory = DistrictDirectory(district_reference) if district_reference is not None else None
     report = dict(version=VERSION, available=column is not None, checked_count=0,
                   empty_count=0, affected_count=0, suggestions=[], scope='summary_only', skipped_documents=[])
+    report['district_review'] = {'available': directory is not None,
+                                 'source': directory.source if directory else None}
     if column is None:
         return report
     by_row = {record['row']: record for record in source_records}
@@ -212,6 +223,8 @@ def review_summaries(sheet, source_records, column, recipients, *, header=0):
         report['checked_count'] += 1
         findings = check_summary(value, recipients, sentence_initial=value == original)
         findings.extend(check_summary_ending(value))
+        if directory is not None:
+            findings.extend(directory.check(value))
         findings.sort(key=lambda finding: (finding['start'], finding['end'], finding['rule']))
         if findings:
             affected.add(number)

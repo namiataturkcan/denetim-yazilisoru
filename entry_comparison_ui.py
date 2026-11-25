@@ -74,6 +74,7 @@ def render_result(report, recipients):
     st.subheader('Giriş Karşılaştırma Sonucu')
     writing = report['summary_review']
     suggestions = writing['suggestions']
+    district_checked = writing.get('district_review', {}).get('available', False)
     writing_checked = writing['available'] and writing['checked_count'] > 0
     values = (('Eşleşen evrak', report['matched'], 'neutral'),
               ('Uyumlu', report['clean']+report['spelling'], 'uygun'),
@@ -105,7 +106,7 @@ def render_result(report, recipients):
         st.caption('Seçilen sütunda güvenle ayrılabilen, dolu bir asıl özet metni bulunamadı.')
     elif suggestions:
         st.caption(f"{writing['checked_count']} özet denetlendi; {writing['affected_count']} özette {len(suggestions)} öneri bulundu. "
-                   'Yalnızca asıl özet cümlesi denetlenir; kişi/yer adları ve otomatik eklenen bilgiler kapsam dışıdır. '
+                   'Yalnızca asıl özet cümlesi denetlenir; kişi adları ve otomatik eklenen bilgiler kapsam dışıdır. '
                    'Özetin “ilişkin” ile bitmesi de kontrol edilir. Bağlama bağlı önerileri metnin anlamına göre değerlendirin.')
         st.markdown(writing_suggestions_table(suggestions[:500]), unsafe_allow_html=True)
         if len(suggestions) > 500:
@@ -113,7 +114,13 @@ def render_result(report, recipients):
         st.download_button('Yazım önerilerini indir (CSV)', suggestions_csv(writing),
                            file_name='kkbs-ozet-yazim-onerileri.csv', mime='text/csv', on_click='ignore')
     else:
-        st.caption(f"{writing['checked_count']} özette tanımlı yazım kuralları ve “ilişkin” bitişi kapsamında öneri bulunmadı. Kişi ve yer adları denetlenmez.")
+        st.caption(f"{writing['checked_count']} özette etkin denetimler kapsamında öneri bulunmadı. Kişi adlarına yazım önerisi verilmez.")
+    if district_checked:
+        source = writing['district_review']['source']
+        st.caption('İlçe kaynağı: ' + source['file'] + '. Açıkça ilçe olarak belirtilen adlar ve il–ilçe eşleşmeleri denetlenir. '
+                   'Listede bulunmayan yerler kesin hata veya belde/köy kabul edilmez; kaynağın tarihine göre kontrol önerisi verilir.')
+    else:
+        st.caption('İlçe adları henüz doğrulanmıyor; kullanıcının ilçe referans listesi bekleniyor.')
     if writing['empty_count']:
         st.caption(f"Not: {writing['empty_count']} kaydın özeti boş olduğu için yazım denetimi yapılmadı.")
     if writing['skipped_documents']:

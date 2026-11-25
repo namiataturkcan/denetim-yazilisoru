@@ -101,6 +101,49 @@ def test_unknown_same_name_is_not_approved_by_agreement_alone():
     assert report['issues'][0]['field'] == 'member_reference'
 
 
+@pytest.mark.parametrize('left,right', [
+    ('Hasan ÖZTÜRK', 'Hasan ÖZTÜRKMEN'),
+    ('Hasan ÖZTÜRKMEN', 'Hasan ÖZTÜRK'),
+    ('Cengiz ÇİÇEK', 'Çiçek OTLU'),
+    ('Çiçek OTLU', 'Cengiz ÇİÇEK'),
+])
+def test_search_suggestion_selection_errors_are_red_not_typographic(left, right):
+    result = compare(record(member=left), record(member=right))
+    assert result['different'] == 1 and not result['spelling']
+    assert any(i['field'] == 'member' and i['status'] == 'uyari' for i in result['issues'])
+
+
+@pytest.mark.parametrize('full', ['Hasan ÖZTÜRK', 'Hasan ÖZTÜRKMEN'])
+def test_incomplete_search_name_cannot_choose_between_known_members(full):
+    result = compare(record(member=full), record(member='Hasan Öztür'))
+    assert result['uncertain'] == 1 and not result['clean'] and not result['spelling']
+    assert any('birden fazla' in i['explanation'] for i in result['issues'])
+
+
+def test_same_name_province_disagreement_remains_red_with_typo_in_ebys_name():
+    result = compare(record(member=owner('Mustafa DEMİR', 'Kilis')),
+                     record(member=owner('Mustafa Demirr', 'İstanbul')))
+    assert result['different'] == 1 and not result['spelling']
+    assert any(i['field'] == 'province' and i['status'] == 'uyari' for i in result['issues'])
+
+
+@pytest.mark.parametrize('name,wrong', [
+    ('Hasan ÖZTÜRK', 'Hasan ÖZTÜRKMEN'),
+    ('Cengiz ÇİÇEK', 'Çiçek OTLU'),
+    ('Mustafa DEMİR', 'Mustafa DEMİR'),
+])
+def test_bulk_scans_keep_similar_members_distinct(name, wrong):
+    review, pages = reading()
+    province = 'Bursa' if name == 'Hasan ÖZTÜRK' else 'İstanbul'
+    review = bulk.BulkReading.model_validate_json(review.model_dump_json()
+        .replace('Ömer Faruk GERGERLİOĞLU', name).replace('Kocaeli', province))
+    pages[0]['ocr'] = review.pages[0].text
+    expected_province = {'Hasan ÖZTÜRKMEN': 'Gaziantep', 'Çiçek OTLU': 'İstanbul', 'Mustafa DEMİR': 'Kilis'}[wrong]
+    result = bulk.compare_proposal(review, pages, [12], [replace(bulk_record(), member=wrong, province=expected_province)])
+    field = 'KKBS · Seçim çevresi' if name == wrong else 'KKBS · Milletvekili'
+    assert any(i['field'] == field and i['status'] == 'uyari' for i in result['issues'])
+
+
 def test_explicit_province_column_and_case_ascii_normalization():
     headers = ('Evrak No', 'Milletvekili', 'Bakanlık', 'Seçim Çevresi')
     sheet = Sheet('KKBS', [(1, headers), (2, ('100', 'Cicek Otlu', 'Adalet Bakanı', 'Ankara'))])

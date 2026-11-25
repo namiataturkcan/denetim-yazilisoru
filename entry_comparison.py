@@ -195,7 +195,19 @@ def compare_members(left, right, known, full_names=()):
         return 'uygun', ''
     # Never excuse two known, different people as a spelling mistake.
     if ca in known and cb in known:
-        return 'uyari', 'İki kayıtta farklı milletvekili adları var; önergenin aslıyla kontrol edin.'
+        return 'uyari', 'Kaynaklarda iki ayrı milletvekilinin tam adı var; harf veya ad benzerliği aynı kişi kabul edilmez. Önergenin aslıyla kontrol edin.'
+    # A register can contain the unfinished search text instead of a full name.
+    # A one-letter match to one person must not hide another possible completion
+    # (e.g. Hasan Öztür -> Hasan Öztürk / Hasan Öztürkmen).
+    for parts, compact in ((fa.split(), ca), (fb.split(), cb)):
+        if compact in known:
+            continue  # An exact full name takes precedence over prefix matches.
+        completions = {folded(name) for name in full_names
+                       if len(parts) == len(folded(name).split())
+                       and all(len(p) >= 2 and word.startswith(p)
+                               for p, word in zip(parts, folded(name).split()))}
+        if len(completions) > 1:
+            return 'belirsiz', 'Eksik yazılmış ad birden fazla milletvekilinin tam adına tamamlanabiliyor; harf benzerliğiyle kişi seçilmedi.'
     if sorted(fa.split()) == sorted(fb.split()):
         return 'yazim', 'Ad ve soyadı sırası farklı; adın tüm sözcükleri aynı.'
     wa, wb = fa.split(), fb.split()

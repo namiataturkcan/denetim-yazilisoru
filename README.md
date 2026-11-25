@@ -141,6 +141,16 @@ Tekli ve toplu PDF incelemesindeki şekil kontrolü bu listeye dayanır. Toplu i
 
 Listeyi yeniden üretmek için `python scripts/import_member_directory.py DOSYA.xlsx` kullanılır. Bu işlem bakan listesini ve özet üslup kaynağını değiştirmez.
 
+Benzer tam adlar farklı kişileri gösteriyorsa kırmızı uyuşmazlıktır: Hasan ÖZTÜRK / Hasan ÖZTÜRKMEN ve Cengiz ÇİÇEK / Çiçek OTLU gibi seçim hataları küçük yazım farkı kabul edilmez. `Hasan Öztür` gibi birden fazla isme tamamlanabilen eksik girişler de yakın yazım yoluyla onaylanmaz; kontrol gerekli olur. Aynı yanlış kişi iki kayıt için de seçilmişse yalnız kayıt karşılaştırması bu hatayı ortaya çıkaramaz; fiziksel önergeyle karşılaştırma gerekir.
+
+### İlçe denetiminin kaynak durumu
+
+İstenen İçişleri Bakanlığı **İl ve İlçe Kuruluş Tarihleri 2018.pdf** bağlantısı 25.11.2026 tarihinde HTTP 500 ve `Access Denied` yanıtı verdi. Kaynak PDF alınamadığı için **ilçe denetimi henüz etkin değildir**; arayüzde ve JSON'da bu durum açıkça belirtilir. Üretim ilçe listesi tahminle veya test verileriyle doldurulmaz.
+
+`district_validation.py` ve özet raporuna bağlantısı hazırdır. Kullanıcının PDF'si alınıp doğrulandıktan sonra `district_reference.json` dosyasında `source` (dosya adı, URL, içerik SHA-256 ve liste tarihi) ve `provinces` (il → ilçe adları listesi) saklanır. Kod ve kaynak içerikleri özet kontrolünün sürümüne dahildir; değişiklikte eski sonuçlar geçersizleşir.
+
+Bu denetim asıl özette açıkça **ilçe** olarak geçen adlara odaklanır; ad yazımını ve doğrudan belirtilmiş il–ilçe bağını kontrol eder. Yakın yazımlar öneridir; birden fazla adaydan otomatik seçim yapılmaz. Köy/belde/kişi adları ilçeymiş gibi denetlenmez. Tarihsel listede bulunmayan yer için güncel idari statü veya belde/köy olduğu iddia edilmez; kaynak tarihi belirtilerek kontrol istenir. Öneriler mevcut Evrak No / Olan / Olması gereken tablosuna ve yazım CSV/JSON'una eklenir. Bu altyapının testlerindeki yer adları sentetiktir; gerçek ilçe kaynağı yerine kullanılamaz.
+
 Seçim çevresi kontrolü, imza alanından birebir okunan isim ve ili karşılaştırır. İstanbul yerine Diyarbakır yazılması gereken bir üyede yanlış il kırmızı uyarıdır. Kullanıcının açık talimatı gereği Dersim, Tunceli'nin eş anlamlısı kabul edilmez. Belgede geçen konu/olay yerleri seçim çevresi olarak kullanılmaz. Çok imzalı belgelerde her imza kontrol edilir; tek seçim çevresi kartında bütün sonuçlar açıklanır; bütün kesin hatalar kendi sayfalarında ve imza bloklarında işaretlenir.
 
 Özet üslubu için önceki `KKBS_YazılıOnerge_Rapor_19-10-2026 09_27.xlsx` dosyasındaki 50.416 önerge kullanılmaya devam edilir. Excel'in tarihsel bakan isimleri muhatap listesine alınmamıştır; bakan kontrolü yalnızca `rules.json` içindeki kullanıcı listesiyle yapılır. Ham Excel ve tüm önerge dökümü depoya eklenmez. Gerekli ad–il eşleşmeleri, kaynak dosyanın SHA-256 değeri, üslup istatistikleri ve 22 temsili özet örneği tutulur. Eski `scripts/import_reference_workbook.py` betiği tarihsel önerge dökümünü yeniden üretir ve milletvekili dosyasını da yazar; kullanılırsa ardından güncel milletvekili listesi yukarıdaki betikle yeniden içeri alınmalıdır. Farklı dönemler otomatik olarak güncel kabul edilmez.
