@@ -117,7 +117,9 @@ def render_result(report, recipients):
         st.caption(f"{writing['checked_count']} özette etkin denetimler kapsamında öneri bulunmadı. Kişi adlarına yazım önerisi verilmez.")
     if district_checked:
         source = writing['district_review']['source']
-        st.caption('İlçe kaynağı: ' + source['file'] + '. Açıkça ilçe olarak belirtilen adlar ve il–ilçe eşleşmeleri denetlenir. '
+        st.caption('İlçe kaynağı: ' + source['file']
+                   + (f" · {source['province_count']} il / {source['district_count']} ilçe kaydı" if 'province_count' in source else '')
+                   + '. Açıkça ilçe olarak belirtilen adlar ve il–ilçe eşleşmeleri denetlenir. '
                    'Listede bulunmayan yerler kesin hata veya belde/köy kabul edilmez; kaynağın tarihine göre kontrol önerisi verilir.')
     else:
         st.caption('İlçe adları henüz doğrulanmıyor; kullanıcının ilçe referans listesi bekleniyor.')

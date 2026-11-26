@@ -93,6 +93,6 @@ def test_only_manual_summary_is_checked_and_district_suggestions_use_existing_ex
     assert 'Milletvekili' not in finding['summary']
     assert 'İkinciil / Yazlık' in suggestions_csv(report).decode('utf-8-sig')
     # An inaccessible source must not silently become a guessed built-in list.
-    without_source = review_summaries(sheet, records, 1, RULES['recipients'], header=1)
+    without_source = review_summaries(sheet, records, 1, RULES['recipients'], header=1, district_reference=None)
     assert without_source['district_review'] == {'available': False, 'source': None}
     assert without_source['suggestions'] == []

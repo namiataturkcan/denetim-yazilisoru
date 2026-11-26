@@ -14,7 +14,21 @@ WORD = rf'[{LETTERS}0-9]+'
 TOKEN = re.compile(rf'\b{WORD}\b')
 DISTRICT = re.compile(r'\bilçe(?:si(?:nin|ne|nde(?:ki)?|nden)?|leri(?:nin|ne|nde(?:ki)?|nden)?|lerde(?:ki)?|lerden)?\b', re.I)
 GENERIC = {'bir', 'bu', 'şu', 'o', 'bazı', 'birçok', 'birkaç', 'tüm', 'bütün', 'her',
-           'diğer', 'komşu', 'ilgili', 'kendi', 'aynı', 'hangi', 'çeşitli', 'merkez'}
+           'diğer', 'komşu', 'ilgili', 'kendi', 'aynı', 'hangi', 'çeşitli', 'merkez',
+           'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on',
+           'yirmi', 'otuz', 'kırk', 'elli', 'altmış', 'yetmiş', 'seksen', 'doksan', 'yüz', 'bin'}
+
+
+def compact_name(name):
+    # Numeric spelling is a language transformation, not an extra place list;
+    # the resulting name must still occur in the user's source.
+    parts = folded(name).split()
+    if len(parts) > 1 and parts[0].isdigit() and 0 < int(parts[0]) < 100:
+        units = ('', 'bir', 'iki', 'uc', 'dort', 'bes', 'alti', 'yedi', 'sekiz', 'dokuz')
+        tens = ('', 'on', 'yirmi', 'otuz', 'kirk', 'elli', 'altmis', 'yetmis', 'seksen', 'doksan')
+        number = int(parts[0])
+        parts[0] = tens[number//10] + units[number % 10]
+    return ''.join(parts)
 
 
 class DistrictDirectory:
@@ -31,7 +45,7 @@ class DistrictDirectory:
         for province, districts in self.provinces.items():
             for district in districts:
                 self.exact[normalize(district)].add((province, district))
-                self.ascii[folded(district).replace(' ', '')].add((province, district))
+                self.ascii[compact_name(district)].add((province, district))
         self.max_words = max(len(d.split()) for ds in self.provinces.values() for d in ds)
 
     def _name_before(self, value, end):
@@ -40,12 +54,17 @@ class DistrictDirectory:
         offset = max(0, len(prefix)-100)
         if not tokens or tokens[-1].end()+offset != len(prefix):
             return None
-        # Longest exact multiword name first (e.g. a numbered district).
-        for count in range(min(self.max_words, len(tokens)), 0, -1):
+        # Also keep source-backed split/numeric spellings whole, so e.g.
+        # "Marmara Ereğlisi" is not misread as the unrelated suffix "Ereğlisi".
+        for count in range(min(max(self.max_words, 3), len(tokens)), 0, -1):
             start = tokens[-count].start()+offset
             name = prefix[start:]
-            if normalize(name) in self.exact:
+            if re.fullmatch(rf'{WORD}(?:\s+{WORD})*', name) and (
+                    normalize(name) in self.exact or compact_name(name) in self.ascii):
                 return start, len(prefix), name
+        if len(tokens) >= 2 and tokens[-2].group().isdigit():
+            start = tokens[-2].start()+offset
+            return start, len(prefix), prefix[start:]
         last = tokens[-1]
         return last.start()+offset, last.end()+offset, last.group()
 
@@ -82,7 +101,7 @@ class DistrictDirectory:
             for start, end, name in reversed(mentions):
                 key = normalize(name)
                 matches = self.exact.get(key, set())
-                if key in GENERIC and not matches:
+                if (key in GENERIC or name.isdigit()) and not matches:
                     continue
                 if matches:
                     if province and not any(p == province for p, _ in matches):
@@ -94,7 +113,7 @@ class DistrictDirectory:
                 # Lowercase narrative words before a generic plural are not names.
                 if not province and not name[0].isupper() and not marker.group().lower().startswith('ilçesi'):
                     continue
-                compact = folded(name).replace(' ', '')
+                compact = compact_name(name)
                 candidates = self.ascii.get(compact, set())
                 if not candidates and len(compact) >= 4:
                     candidates = {pair for candidate, pairs in self.ascii.items()

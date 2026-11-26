@@ -1,0 +1,1348 @@
+{
+  "source": {
+    "file": "İl ve İlçe Kuruluş Tarihleri 2018.pdf",
+    "url": "https://www.icisleri.gov.tr/kurumlar/icisleri.gov.tr/IcSite/illeridaresi/Bilgiler2/%C4%B0l%20ve%20%C4%B0l%C3%A7e%20Kurulu%C5%9F%20Tarihleri%202018.pdf",
+    "sha256": "444121af93c5f77a87d92776cf533c6045ee571e02ff1c819f7ae18e41eccc80",
+    "list_year": 2018,
+    "pdf_creation_date": "D:20181114142413+03'00'",
+    "page_count": 86,
+    "province_count": 81,
+    "district_count": 922,
+    "scope": "PDF tablolarındaki numaralı ilçe satırları. İl başlıkları ilçe kaydı değildir; numarasız merkez ilçeler eklenmemiştir. Güncel statü listesi değildir."
+  },
+  "provinces": {
+    "Adana": [
+      "Aladağ",
+      "Ceyhan",
+      "Çukurova",
+      "Feke",
+      "İmamoğlu",
+      "Karaisalı",
+      "Karataş",
+      "Kozan",
+      "Pozantı",
+      "Saimbeyli",
+      "Sarıçam",
+      "Seyhan",
+      "Tufanbeyli",
+      "Yumurtalık",
+      "Yüreğir"
+    ],
+    "Adıyaman": [
+      "Besni",
+      "Çelikhan",
+      "Gerger",
+      "Gölbaşı",
+      "Kahta",
+      "Samsat",
+      "Sincik",
+      "Tut"
+    ],
+    "Afyonkarahisar": [
+      "Başmakçı",
+      "Bayat",
+      "Bolvadin",
+      "Çay",
+      "Çobanlar",
+      "Dazkırı",
+      "Dinar",
+      "Emirdağ",
+      "Evciler",
+      "Hocalar",
+      "İhsaniye",
+      "İscehisar",
+      "Kızılören",
+      "Sandıklı",
+      "Sinanpaşa",
+      "Sultandağı",
+      "Şuhut"
+    ],
+    "Ağrı": [
+      "Diyadin",
+      "Doğubayazıt",
+      "Eleşkirt",
+      "Hamur",
+      "Patnos",
+      "Taşlıçay",
+      "Tutak"
+    ],
+    "Aksaray": [
+      "Ağaçören",
+      "Eskil",
+      "Gülağaç",
+      "Güzelyurt",
+      "Ortaköy",
+      "Sarıyahşi",
+      "Sultanhanı"
+    ],
+    "Amasya": [
+      "Göynücek",
+      "Gümüşhacıköy",
+      "Hamamözü",
+      "Merzifon",
+      "Suluova",
+      "Taşova"
+    ],
+    "Ankara": [
+      "Akyurt",
+      "Altındağ",
+      "Ayaş",
+      "Bala",
+      "Beypazarı",
+      "Çamlıdere",
+      "Çankaya",
+      "Çubuk",
+      "Elmadağ",
+      "Etimesgut",
+      "Evren",
+      "Gölbaşı",
+      "Güdül",
+      "Haymana",
+      "Kalecik",
+      "Kahramankazan",
+      "Keçiören",
+      "Kızılcahamam",
+      "Mamak",
+      "Nallıhan",
+      "Polatlı",
+      "Pursaklar",
+      "Sincan",
+      "Şereflikoçhisar",
+      "Yenimahalle"
+    ],
+    "Antalya": [
+      "Akseki",
+      "Aksu",
+      "Alanya",
+      "Demre",
+      "Döşemealtı",
+      "Elmalı",
+      "Finike",
+      "Gazipaşa",
+      "Gündoğmuş",
+      "İbradı",
+      "Kaş",
+      "Kemer",
+      "Kepez",
+      "Konyaaltı",
+      "Korkuteli",
+      "Kumluca",
+      "Manavgat",
+      "Muratpaşa",
+      "Serik"
+    ],
+    "Ardahan": [
+      "Çıldır",
+      "Damal",
+      "Göle",
+      "Hanak",
+      "Posof"
+    ],
+    "Artvin": [
+      "Ardanuç",
+      "Arhavi",
+      "Borçka",
+      "Hopa",
+      "Murgul",
+      "Şavşat",
+      "Yusufeli",
+      "Kemalpaşa"
+    ],
+    "Aydın": [
+      "Bozdoğan",
+      "Buharkent",
+      "Çine",
+      "Didim",
+      "Efeler",
+      "Germencik",
+      "İncirliova",
+      "Karacasu",
+      "Karpuzlu",
+      "Koçarlı",
+      "Köşk",
+      "Kuşadası",
+      "Kuyucak",
+      "Nazilli",
+      "Söke",
+      "Sultanhisar",
+      "Yenipazar"
+    ],
+    "Balıkesir": [
+      "Altıeylül",
+      "Ayvalık",
+      "Balya",
+      "Bandırma",
+      "Bigadiç",
+      "Burhaniye",
+      "Dursunbey",
+      "Edremit",
+      "Erdek",
+      "Gömeç",
+      "Gönen",
+      "Havran",
+      "İvrindi",
+      "Karesi",
+      "Kepsut",
+      "Manyas",
+      "Marmara",
+      "Savaştepe",
+      "Sındırgı",
+      "Susurluk"
+    ],
+    "Bartın": [
+      "Amasra",
+      "Kurucaşile",
+      "Ulus"
+    ],
+    "Batman": [
+      "Beşiri",
+      "Gercüş",
+      "Hasankeyf",
+      "Kozluk",
+      "Sason"
+    ],
+    "Bayburt": [
+      "Aydıntepe",
+      "Demirözü"
+    ],
+    "Bilecik": [
+      "Bozüyük",
+      "Gölpazarı",
+      "İnhisar",
+      "Osmaneli",
+      "Pazaryeri",
+      "Söğüt",
+      "Yenipazar"
+    ],
+    "Bingöl": [
+      "Adaklı",
+      "Genç",
+      "Karlıova",
+      "Kiğı",
+      "Solhan",
+      "Yayladere",
+      "Yedisu"
+    ],
+    "Bitlis": [
+      "Adilcevaz",
+      "Ahlat",
+      "Güroymak",
+      "Hizan",
+      "Mutki",
+      "Tatvan"
+    ],
+    "Bolu": [
+      "Dörtdivan",
+      "Gerede",
+      "Göynük",
+      "Kıbrıscık",
+      "Mengen",
+      "Mudurnu",
+      "Seben",
+      "Yeniçağa"
+    ],
+    "Burdur": [
+      "Ağlasun",
+      "Altınyayla",
+      "Bucak",
+      "Çavdır",
+      "Çeltikçi",
+      "Gölhisar",
+      "Karamanlı",
+      "Kemer",
+      "Tefenni",
+      "Yeşilova"
+    ],
+    "Bursa": [
+      "Büyükorhan",
+      "Gemlik",
+      "Gürsu",
+      "Harmancık",
+      "İnegöl",
+      "İznik",
+      "Karacabey",
+      "Keles",
+      "Kestel",
+      "Mudanya",
+      "Mustafakemalpaşa",
+      "Nilüfer",
+      "Orhaneli",
+      "Orhangazi",
+      "Osmangazi",
+      "Yenişehir",
+      "Yıldırım"
+    ],
+    "Çanakkale": [
+      "Ayvacık",
+      "Bayramiç",
+      "Biga",
+      "Bozcaada",
+      "Çan",
+      "Eceabat",
+      "Ezine",
+      "Gelibolu",
+      "Gökçeada",
+      "Lapseki",
+      "Yenice"
+    ],
+    "Çankırı": [
+      "Atkaracalar",
+      "Bayramören",
+      "Çerkeş",
+      "Eldivan",
+      "Ilgaz",
+      "Kızılırmak",
+      "Korgun",
+      "Kurşunlu",
+      "Orta",
+      "Şabanözü",
+      "Yapraklı"
+    ],
+    "Çorum": [
+      "Alaca",
+      "Bayat",
+      "Boğazkale",
+      "Dodurga",
+      "İskilip",
+      "Kargı",
+      "Laçin",
+      "Mecitözü",
+      "Oğuzlar",
+      "Ortaköy",
+      "Osmancık",
+      "Sungurlu",
+      "Uğurludağ"
+    ],
+    "Denizli": [
+      "Acıpayam",
+      "Pamukkale",
+      "Babadağ",
+      "Baklan",
+      "Bekilli",
+      "Beyağaç",
+      "Bozkurt",
+      "Buldan",
+      "Çal",
+      "Çameli",
+      "Çardak",
+      "Çivril",
+      "Güney",
+      "Honaz",
+      "Kale",
+      "Merkezefendi",
+      "Sarayköy",
+      "Serinhisar",
+      "Tavas"
+    ],
+    "Diyarbakır": [
+      "Bağlar",
+      "Bismil",
+      "Çermik",
+      "Çınar",
+      "Çüngüş",
+      "Dicle",
+      "Eğil",
+      "Ergani",
+      "Hani",
+      "Hazro",
+      "Kayapınar",
+      "Kocaköy",
+      "Kulp",
+      "Lice",
+      "Silvan",
+      "Sur",
+      "Yenişehir"
+    ],
+    "Düzce": [
+      "Akçakoca",
+      "Cumayeri",
+      "Çilimli",
+      "Gölyaka",
+      "Gümüşova",
+      "Kaynaşlı",
+      "Yığılca"
+    ],
+    "Edirne": [
+      "Enez",
+      "Havsa",
+      "İpsala",
+      "Keşan",
+      "Lalapaşa",
+      "Meriç",
+      "Süloğlu",
+      "Uzunköprü"
+    ],
+    "Elazığ": [
+      "Ağın",
+      "Alacakaya",
+      "Arıcak",
+      "Baskil",
+      "Karakoçan",
+      "Keban",
+      "Kovancılar",
+      "Maden",
+      "Palu",
+      "Sivrice"
+    ],
+    "Erzincan": [
+      "Çayırlı",
+      "İliç",
+      "Kemah",
+      "Kemaliye",
+      "Otlukbeli",
+      "Refahiye",
+      "Tercan",
+      "Üzümlü"
+    ],
+    "Erzurum": [
+      "Aşkale",
+      "Aziziye",
+      "Çat",
+      "Hınıs",
+      "Horasan",
+      "İspir",
+      "Karaçoban",
+      "Karayazı",
+      "Köprüköy",
+      "Narman",
+      "Oltu",
+      "Olur",
+      "Palandöken",
+      "Pasinler",
+      "Pazaryolu",
+      "Şenkaya",
+      "Tekman",
+      "Tortum",
+      "Uzundere",
+      "Yakutiye"
+    ],
+    "Eskişehir": [
+      "Alpu",
+      "Beylikova",
+      "Çifteler",
+      "Günyüzü",
+      "Han",
+      "İnönü",
+      "Mahmudiye",
+      "Mihalgazi",
+      "Mihalıççık",
+      "Odunpazarı",
+      "Sarıcakaya",
+      "Seyitgazi",
+      "Sivrihisar",
+      "Tepebaşı"
+    ],
+    "Gaziantep": [
+      "Araban",
+      "İslahiye",
+      "Karkamış",
+      "Nizip",
+      "Nurdağı",
+      "Oğuzeli",
+      "Şahinbey",
+      "Şehitkamil",
+      "Yavuzeli"
+    ],
+    "Giresun": [
+      "Alucra",
+      "Bulancak",
+      "Çamoluk",
+      "Çanakçı",
+      "Dereli",
+      "Doğankent",
+      "Espiye",
+      "Eynesil",
+      "Görele",
+      "Güce",
+      "Keşap",
+      "Piraziz",
+      "Şebinkarahisar",
+      "Tirebolu",
+      "Yağlıdere"
+    ],
+    "Gümüşhane": [
+      "Kelkit",
+      "Köse",
+      "Kürtün",
+      "Şiran",
+      "Torul"
+    ],
+    "Hakkari": [
+      "Çukurca",
+      "Şemdinli",
+      "Yüksekova",
+      "Derecik"
+    ],
+    "Hatay": [
+      "Altınözü",
+      "Antakya",
+      "Arsuz",
+      "Belen",
+      "Defne",
+      "Dörtyol",
+      "Erzin",
+      "Hassa",
+      "İskenderun",
+      "Kırıkhan",
+      "Kumlu",
+      "Payas",
+      "Reyhanlı",
+      "Samandağ",
+      "Yayladağı"
+    ],
+    "Iğdır": [
+      "Aralık",
+      "Karakoyunlu",
+      "Tuzluca"
+    ],
+    "Isparta": [
+      "Aksu",
+      "Atabey",
+      "Eğirdir",
+      "Gelendost",
+      "Gönen",
+      "Keçiborlu",
+      "Senirkent",
+      "Sütçüler",
+      "Şarkikaraağaç",
+      "Uluborlu",
+      "Yalvaç",
+      "Yenişarbademli"
+    ],
+    "İstanbul": [
+      "Adalar",
+      "Arnavutköy",
+      "Ataşehir",
+      "Avcılar",
+      "Bağcılar",
+      "Bahçelievler",
+      "Bakırköy",
+      "Başakşehir",
+      "Bayrampaşa",
+      "Beşiktaş",
+      "Beykoz",
+      "Beylikdüzü",
+      "Beyoğlu",
+      "Büyükçekmece",
+      "Çatalca",
+      "Çekmeköy",
+      "Esenler",
+      "Esenyurt",
+      "Eyüp",
+      "Fatih",
+      "Gaziosmanpaşa",
+      "Güngören",
+      "Kadıköy",
+      "Kağıthane",
+      "Kartal",
+      "Küçükçekmece",
+      "Maltepe",
+      "Pendik",
+      "Sancaktepe",
+      "Sarıyer",
+      "Silivri",
+      "Sultanbeyli",
+      "Sultangazi",
+      "Şile",
+      "Şişli",
+      "Tuzla",
+      "Ümraniye",
+      "Üsküdar",
+      "Zeytinburnu"
+    ],
+    "İzmir": [
+      "Aliağa",
+      "Balçova",
+      "Bayındır",
+      "Bayraklı",
+      "Bergama",
+      "Beydağ",
+      "Bornova",
+      "Buca",
+      "Çeşme",
+      "Çiğli",
+      "Dikili",
+      "Foça",
+      "Gaziemir",
+      "Güzelbahçe",
+      "Karabağlar",
+      "Karaburun",
+      "Karşıyaka",
+      "Kemalpaşa",
+      "Kınık",
+      "Kiraz",
+      "Konak",
+      "Menderes",
+      "Menemen",
+      "Narlıdere",
+      "Ödemiş",
+      "Seferihisar",
+      "Selçuk",
+      "Tire",
+      "Torbalı",
+      "Urla"
+    ],
+    "Kahramanmaraş": [
+      "Afşin",
+      "Andırın",
+      "Çağlayancerit",
+      "Dulkadiroğlu",
+      "Ekinözü",
+      "Elbistan",
+      "Göksun",
+      "Nurhak",
+      "Onikişubat",
+      "Pazarcık",
+      "Türkoğlu"
+    ],
+    "Karabük": [
+      "Eflani",
+      "Eskipazar",
+      "Ovacık",
+      "Safranbolu",
+      "Yenice"
+    ],
+    "Karaman": [
+      "Ayrancı",
+      "Başyayla",
+      "Ermenek",
+      "Kazımkarabekir",
+      "Sarıveliler"
+    ],
+    "Kars": [
+      "Akyaka",
+      "Arpaçay",
+      "Digor",
+      "Kağızman",
+      "Sarıkamış",
+      "Selim",
+      "Susuz"
+    ],
+    "Kastamonu": [
+      "Abana",
+      "Ağlı",
+      "Araç",
+      "Azdavay",
+      "Bozkurt",
+      "Cide",
+      "Çatalzeytin",
+      "Daday",
+      "Devrekani",
+      "Doğanyurt",
+      "Hanönü",
+      "İhsangazi",
+      "İnebolu",
+      "Küre",
+      "Pınarbaşı",
+      "Seydiler",
+      "Şenpazar",
+      "Taşköprü",
+      "Tosya"
+    ],
+    "Kayseri": [
+      "Akkışla",
+      "Bünyan",
+      "Develi",
+      "Felahiye",
+      "Hacılar",
+      "İncesu",
+      "Kocasinan",
+      "Melikgazi",
+      "Özvatan",
+      "Pınarbaşı",
+      "Sarıoğlan",
+      "Sarız",
+      "Talas",
+      "Tomarza",
+      "Yahyalı",
+      "Yeşilhisar"
+    ],
+    "Kırıkkale": [
+      "Bahşili",
+      "Balışeyh",
+      "Çelebi",
+      "Delice",
+      "Karakeçili",
+      "Keskin",
+      "Sulakyurt",
+      "Yahşihan"
+    ],
+    "Kırklareli": [
+      "Babaeski",
+      "Demirköy",
+      "Kofçaz",
+      "Lüleburgaz",
+      "Pehlivanköy",
+      "Pınarhisar",
+      "Vize"
+    ],
+    "Kırşehir": [
+      "Akçakent",
+      "Akpınar",
+      "Boztepe",
+      "Çiçekdağı",
+      "Kaman",
+      "Mucur"
+    ],
+    "Kilis": [
+      "Elbeyli",
+      "Musabeyli",
+      "Polateli"
+    ],
+    "Kocaeli": [
+      "Başiskele",
+      "Çayırova",
+      "Darıca",
+      "Derince",
+      "Dilovası",
+      "Gebze",
+      "Gölcük",
+      "İzmit",
+      "Kandıra",
+      "Karamürsel",
+      "Kartepe",
+      "Körfez"
+    ],
+    "Konya": [
+      "Ahırlı",
+      "Akören",
+      "Akşehir",
+      "Altınekin",
+      "Beyşehir",
+      "Bozkır",
+      "Cihanbeyli",
+      "Çeltik",
+      "Çumra",
+      "Derbent",
+      "Derebucak",
+      "Doğanhisar",
+      "Emirgazi",
+      "Ereğli",
+      "Güneysınır",
+      "Hadim",
+      "Halkapınar",
+      "Hüyük",
+      "Ilgın",
+      "Kadınhanı",
+      "Karapınar",
+      "Karatay",
+      "Kulu",
+      "Meram",
+      "Sarayönü",
+      "Selçuklu",
+      "Seydişehir",
+      "Taşkent",
+      "Tuzlukçu",
+      "Yalıhüyük",
+      "Yunak"
+    ],
+    "Kütahya": [
+      "Altıntaş",
+      "Aslanapa",
+      "Çavdarhisar",
+      "Domaniç",
+      "Dumlupınar",
+      "Emet",
+      "Gediz",
+      "Hisarcık",
+      "Pazarlar",
+      "Simav",
+      "Şaphane",
+      "Tavşanlı"
+    ],
+    "Malatya": [
+      "Akçadağ",
+      "Arapgir",
+      "Arguvan",
+      "Battalgazi",
+      "Darende",
+      "Doğanşehir",
+      "Doğanyol",
+      "Hekimhan",
+      "Kale",
+      "Kuluncak",
+      "Pütürge",
+      "Yazıhan",
+      "Yeşilyurt"
+    ],
+    "Manisa": [
+      "Ahmetli",
+      "Akhisar",
+      "Alaşehir",
+      "Demirci",
+      "Gölmarmara",
+      "Gördes",
+      "Kırkağaç",
+      "Köprübaşı",
+      "Kula",
+      "Salihli",
+      "Sarıgöl",
+      "Saruhanlı",
+      "Selendi",
+      "Soma",
+      "Şehzadeler",
+      "Turgutlu",
+      "Yunusemre"
+    ],
+    "Mardin": [
+      "Artuklu",
+      "Dargeçit",
+      "Derik",
+      "Kızıltepe",
+      "Mazıdağı",
+      "Midyat",
+      "Nusaybin",
+      "Ömerli",
+      "Savur",
+      "Yeşilli"
+    ],
+    "Mersin": [
+      "Akdeniz",
+      "Anamur",
+      "Aydıncık",
+      "Bozyazı",
+      "Çamlıyayla",
+      "Erdemli",
+      "Gülnar",
+      "Mezitli",
+      "Mut",
+      "Silifke",
+      "Tarsus",
+      "Toroslar",
+      "Yenişehir"
+    ],
+    "Muğla": [
+      "Bodrum",
+      "Dalaman",
+      "Datça",
+      "Fethiye",
+      "Kavaklıdere",
+      "Köyceğiz",
+      "Marmaris",
+      "Menteşe",
+      "Milas",
+      "Ortaca",
+      "Seydikemer",
+      "Ula",
+      "Yatağan"
+    ],
+    "Muş": [
+      "Bulanık",
+      "Hasköy",
+      "Korkut",
+      "Malazgirt",
+      "Varto"
+    ],
+    "Nevşehir": [
+      "Acıgöl",
+      "Avanos",
+      "Derinkuyu",
+      "Gülşehir",
+      "Hacıbektaş",
+      "Kozaklı",
+      "Ürgüp"
+    ],
+    "Niğde": [
+      "Altunhisar",
+      "Bor",
+      "Çamardı",
+      "Çiftlik",
+      "Ulukışla"
+    ],
+    "Ordu": [
+      "Akkuş",
+      "Altınordu",
+      "Aybastı",
+      "Çamaş",
+      "Çatalpınar",
+      "Çaybaşı",
+      "Fatsa",
+      "Gölköy",
+      "Gülyalı",
+      "Gürgentepe",
+      "İkizce",
+      "Kabadüz",
+      "Kabataş",
+      "Korgan",
+      "Kumru",
+      "Mesudiye",
+      "Perşembe",
+      "Ulubey",
+      "Ünye"
+    ],
+    "Osmaniye": [
+      "Bahçe",
+      "Düziçi",
+      "Hasanbeyli",
+      "Kadirli",
+      "Sumbas",
+      "Toprakkale"
+    ],
+    "Rize": [
+      "Ardeşen",
+      "Çamlıhemşin",
+      "Çayeli",
+      "Derepazarı",
+      "Fındıklı",
+      "Güneysu",
+      "Hemşin",
+      "İkizdere",
+      "İyidere",
+      "Kalkandere",
+      "Pazar"
+    ],
+    "Sakarya": [
+      "Adapazarı",
+      "Akyazı",
+      "Arifiye",
+      "Erenler",
+      "Ferizli",
+      "Geyve",
+      "Hendek",
+      "Karapürçek",
+      "Karasu",
+      "Kaynarca",
+      "Kocaali",
+      "Pamukova",
+      "Sapanca",
+      "Serdivan",
+      "Söğütlü",
+      "Taraklı"
+    ],
+    "Samsun": [
+      "Ondokuzmayıs",
+      "Alaçam",
+      "Asarcık",
+      "Atakum",
+      "Ayvacık",
+      "Bafra",
+      "Canik",
+      "Çarşamba",
+      "Havza",
+      "İlkadım",
+      "Kavak",
+      "Ladik",
+      "Salıpazarı",
+      "Tekkeköy",
+      "Terme",
+      "Vezirköprü",
+      "Yakakent"
+    ],
+    "Siirt": [
+      "Tillo",
+      "Baykan",
+      "Eruh",
+      "Kurtalan",
+      "Pervari",
+      "Şirvan"
+    ],
+    "Sinop": [
+      "Ayancık",
+      "Boyabat",
+      "Dikmen",
+      "Durağan",
+      "Erfelek",
+      "Gerze",
+      "Saraydüzü",
+      "Türkeli"
+    ],
+    "Sivas": [
+      "Akıncılar",
+      "Altınyayla",
+      "Divriği",
+      "Doğanşar",
+      "Gemerek",
+      "Gölova",
+      "Gürün",
+      "Hafik",
+      "İmranlı",
+      "Kangal",
+      "Koyulhisar",
+      "Suşehri",
+      "Şarkışla",
+      "Ulaş",
+      "Yıldızeli",
+      "Zara"
+    ],
+    "Şanlıurfa": [
+      "Akçakale",
+      "Birecik",
+      "Bozova",
+      "Ceylanpınar",
+      "Eyyübiye",
+      "Halfeti",
+      "Haliliye",
+      "Harran",
+      "Hilvan",
+      "Karaköprü",
+      "Siverek",
+      "Suruç",
+      "Viranşehir"
+    ],
+    "Şırnak": [
+      "Beytüşşebap",
+      "Cizre",
+      "Güçlükonak",
+      "İdil",
+      "Silopi",
+      "Uludere"
+    ],
+    "Tekirdağ": [
+      "Çerkezköy",
+      "Çorlu",
+      "Ergene",
+      "Hayrabolu",
+      "Kapaklı",
+      "Malkara",
+      "Marmaraereğlisi",
+      "Muratlı",
+      "Saray",
+      "Süleymanpaşa",
+      "Şarköy"
+    ],
+    "Tokat": [
+      "Almus",
+      "Artova",
+      "Başçiftlik",
+      "Erbaa",
+      "Niksar",
+      "Pazar",
+      "Reşadiye",
+      "Sulusaray",
+      "Turhal",
+      "Yeşilyurt",
+      "Zile"
+    ],
+    "Trabzon": [
+      "Akçaabat",
+      "Araklı",
+      "Arsin",
+      "Beşikdüzü",
+      "Çarşıbaşı",
+      "Çaykara",
+      "Dernekpazarı",
+      "Düzköy",
+      "Hayrat",
+      "Köprübaşı",
+      "Maçka",
+      "Of",
+      "Ortahisar",
+      "Sürmene",
+      "Şalpazarı",
+      "Tonya",
+      "Vakfıkebir",
+      "Yomra"
+    ],
+    "Tunceli": [
+      "Çemişgezek",
+      "Hozat",
+      "Mazgirt",
+      "Nazımiye",
+      "Ovacık",
+      "Pertek",
+      "Pülümür"
+    ],
+    "Uşak": [
+      "Banaz",
+      "Eşme",
+      "Karahallı",
+      "Sivaslı",
+      "Ulubey"
+    ],
+    "Van": [
+      "Bahçesaray",
+      "Başkale",
+      "Çaldıran",
+      "Çatak",
+      "Edremit",
+      "Erciş",
+      "Gevaş",
+      "Gürpınar",
+      "İpekyolu",
+      "Muradiye",
+      "Özalp",
+      "Saray",
+      "Tuşba"
+    ],
+    "Yalova": [
+      "Altınova",
+      "Armutlu",
+      "Çınarcık",
+      "Çiftlikköy",
+      "Termal"
+    ],
+    "Yozgat": [
+      "Akdağmadeni",
+      "Aydıncık",
+      "Boğazlıyan",
+      "Çandır",
+      "Çayıralan",
+      "Çekerek",
+      "Kadışehri",
+      "Saraykent",
+      "Sarıkaya",
+      "Sorgun",
+      "Şefaatli",
+      "Yenifakılı",
+      "Yerköy"
+    ],
+    "Zonguldak": [
+      "Alaplı",
+      "Çaycuma",
+      "Devrek",
+      "Ereğli",
+      "Gökçebey",
+      "Kilimli",
+      "Kozlu"
+    ]
+  },
+  "province_pages": {
+    "Adana": [
+      2
+    ],
+    "Adıyaman": [
+      3
+    ],
+    "Afyonkarahisar": [
+      4
+    ],
+    "Ağrı": [
+      5
+    ],
+    "Aksaray": [
+      6
+    ],
+    "Amasya": [
+      7
+    ],
+    "Ankara": [
+      8,
+      9
+    ],
+    "Antalya": [
+      10
+    ],
+    "Ardahan": [
+      11
+    ],
+    "Artvin": [
+      12
+    ],
+    "Aydın": [
+      13
+    ],
+    "Balıkesir": [
+      14
+    ],
+    "Bartın": [
+      15
+    ],
+    "Batman": [
+      16
+    ],
+    "Bayburt": [
+      17
+    ],
+    "Bilecik": [
+      18
+    ],
+    "Bingöl": [
+      19
+    ],
+    "Bitlis": [
+      20
+    ],
+    "Bolu": [
+      21
+    ],
+    "Burdur": [
+      22
+    ],
+    "Bursa": [
+      23
+    ],
+    "Çanakkale": [
+      24
+    ],
+    "Çankırı": [
+      25
+    ],
+    "Çorum": [
+      26
+    ],
+    "Denizli": [
+      27
+    ],
+    "Diyarbakır": [
+      28
+    ],
+    "Düzce": [
+      29
+    ],
+    "Edirne": [
+      30
+    ],
+    "Elazığ": [
+      31
+    ],
+    "Erzincan": [
+      32
+    ],
+    "Erzurum": [
+      33
+    ],
+    "Eskişehir": [
+      34
+    ],
+    "Gaziantep": [
+      35
+    ],
+    "Giresun": [
+      36
+    ],
+    "Gümüşhane": [
+      37
+    ],
+    "Hakkari": [
+      38
+    ],
+    "Hatay": [
+      39
+    ],
+    "Iğdır": [
+      40
+    ],
+    "Isparta": [
+      41
+    ],
+    "İstanbul": [
+      42,
+      43
+    ],
+    "İzmir": [
+      44,
+      45
+    ],
+    "Kahramanmaraş": [
+      46
+    ],
+    "Karabük": [
+      47
+    ],
+    "Karaman": [
+      48
+    ],
+    "Kars": [
+      49
+    ],
+    "Kastamonu": [
+      50
+    ],
+    "Kayseri": [
+      51
+    ],
+    "Kırıkkale": [
+      52
+    ],
+    "Kırklareli": [
+      53
+    ],
+    "Kırşehir": [
+      54
+    ],
+    "Kilis": [
+      55
+    ],
+    "Kocaeli": [
+      56
+    ],
+    "Konya": [
+      57,
+      58
+    ],
+    "Kütahya": [
+      59
+    ],
+    "Malatya": [
+      60
+    ],
+    "Manisa": [
+      61
+    ],
+    "Mardin": [
+      62
+    ],
+    "Mersin": [
+      63
+    ],
+    "Muğla": [
+      64
+    ],
+    "Muş": [
+      65
+    ],
+    "Nevşehir": [
+      66
+    ],
+    "Niğde": [
+      67
+    ],
+    "Ordu": [
+      68
+    ],
+    "Osmaniye": [
+      69
+    ],
+    "Rize": [
+      70
+    ],
+    "Sakarya": [
+      71
+    ],
+    "Samsun": [
+      72
+    ],
+    "Siirt": [
+      73
+    ],
+    "Sinop": [
+      74
+    ],
+    "Sivas": [
+      75
+    ],
+    "Şanlıurfa": [
+      76
+    ],
+    "Şırnak": [
+      77
+    ],
+    "Tekirdağ": [
+      78
+    ],
+    "Tokat": [
+      79
+    ],
+    "Trabzon": [
+      80
+    ],
+    "Tunceli": [
+      81
+    ],
+    "Uşak": [
+      82
+    ],
+    "Van": [
+      83
+    ],
+    "Yalova": [
+      84
+    ],
+    "Yozgat": [
+      85
+    ],
+    "Zonguldak": [
+      86
+    ]
+  }
+}

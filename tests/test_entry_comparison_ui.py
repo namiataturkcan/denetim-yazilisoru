@@ -35,6 +35,31 @@ def test_province_reference_change_invalidates_result_even_with_same_names(monke
         assert old_key != at.session_state['entry_result_key']
 
 
+def test_pdf_district_source_is_active_in_summary_suggestions_without_api(monkeypatch):
+    headers = ['Genel Evrak No', 'Önerge Sahibi', 'Önerge Muhatabı', 'Esas No', 'Özet']
+    rows = [[100, 'Çiçek Otlu', 'Adalet Bakanı', '', 'İstanbul’un Esenyurtt ilçesindeki okullara ilişkin'],
+            [101, 'Çiçek Otlu', 'Adalet Bakanı', '', 'Ankara’nın Kadıköy ilçesindeki okullara ilişkin'],
+            [102, 'Çiçek Otlu', 'Adalet Bakanı', '', 'Muğla’nın Gümüşlük ilçesindeki okullara ilişkin']]
+    at = setup(monkeypatch)
+    with patch('app.analyze', side_effect=AssertionError('No API allowed')), \
+         patch('streamlit.file_uploader', return_value=[Upload(workbook(left=rows, right=rows, headers=headers))]):
+        at.run()
+        click(at, 'Girişleri karşılaştır')
+        assert not at.exception and not at.error
+        result = at.session_state['entry_result']
+        assert result['clean'] == 3 and result['different'] == 0
+        writing = result['summary_review']
+        assert writing['district_review']['available']
+        assert {f['rule'] for f in writing['suggestions']} == {
+            'district_spelling', 'district_province', 'district_not_in_source'}
+        tables = [x.value for x in at.markdown if '<table class="entry-review-table entry-writing-table">' in x.value]
+        assert len(tables) == 1
+        assert all(value in tables[0] for value in ('100', '101', '102', 'Esenyurt', 'İstanbul / Kadıköy'))
+        assert any('81 il / 922 ilçe kaydı' in caption.value for caption in at.caption)
+        assert not any('referans listesi bekleniyor' in caption.value for caption in at.caption)
+        assert len(at.get('download_button')) == 3
+
+
 def setup(monkeypatch):
     at = configured(monkeypatch, module="second_reader")
     for name in ('ONERGE_DIRECT_API_KEY', 'ONERGE_API_KEY', 'OPENAI_API_KEY'):
